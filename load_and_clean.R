@@ -11,37 +11,6 @@ staff <- read.csv("../data/Staff_Attributes.csv")
 staff$role1[staff$role1 == "Instructor"] <- "instructor"
 mentees <- rename(mentees, c("Role"="role"))
 
-# collect those people that were active on second nights
-staff2 <- staff[staff$night2!="",]
-colnames(staff2)[4] <- "night"
-colnames(staff2)[7] <- "role"
-staff2$nightnum <- 2
-staff2 <- subset(staff2, select=-c(night1, role1))
-
-
-fixrole <- function(dataframe){
-  for(row in staff2){
-    # if mentor on night 2, then mentee = 1 and room number is not blank
-    if(row$role == "mentor"){
-      row$mentee <- 1
-    }
-    # if not mentor on night 2, then mentee = 0 and room number is NA
-    else{
-      row$mentee <- 0
-      row$room <- NA
-    }
-  }
-}
-
-
-
-
-colnames(staff)[3] <- "night"
-colnames(staff)[6] <- "role"
-staff2$nightnum <- 1
-
-
-
 # add labels, etc.
 add_labels <- function(df)
 {
