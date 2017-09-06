@@ -83,14 +83,19 @@ edges <- add_edge_labels(edges)
 
 # join mentees and staff for use in graph
 staff2 <- staff
-staff2$date_dropped <- NA
+staff2$date_dropped <- factor(NA)
 mentees2 <- mentees
-mentees2$nightnum <- NA
-mentees2$mentee <- NA
+mentees2$nightnum <- factor(NA)
+mentees2$mentee <- factor(NA)
 
 library(gtools)
 participants <- smartbind(staff2, mentees2)
+rm(mentees2, staff2)
 role_nums <- as.factor(participants$role)
 levels(role_nums) <- 1:length(role_nums)
 participants$role_num <- as.numeric(role_nums)
-rm(mentees2, staff2)
+participants <- participants[with(participants, order(role, final_id)),]
+#participants <- participants[with(participants, order(room, role)),]
+
+staff = subset(participants, participants$role != "mentee")
+mentees = subset(participants, participants$role == "mentee")
