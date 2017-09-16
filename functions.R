@@ -1,4 +1,3 @@
-
 source("config.R")
 
 make_graph <- function(participants, edges, semester_a, night_a, strength_a, survey_no_a, sender_role=NA, receiver_role=NA, strength_mode="exact"){
@@ -134,4 +133,42 @@ day_ave_degree_plot <- function(degs, file_suffix, title_prefix, scale_factor, c
     print(grid.arrange(grobs=strength_plots))
     dev.off()
   }
+}
+
+
+plot_outedges_byperson <- function(edges, semester_a, night_a, role_a, scale_factor=3, point_size=0.5){
+  # order them so lines plot correctly
+  edges <- edges[with(edges, order(semester, night, sender_final_id, receiver_final_id, survnum)),]
+  # get subset of edges
+  edges_subset <- edges[with(edges, semester==semester_a & night==night_a & sender_role==role_a),]
+  # setup plot
+  grid_size <- as.integer(sqrt(length(unique(edges_subset$sender_final_id))))+1
+  filen <- paste(paste(paste(output_dir, "outedges_byperson", sep="") , semester_a, night_a, role_a, sep="_"), ".pdf", sep="")
+  pdf(filen, width=grid_size*scale_factor, height=grid_size*scale_factor)
+  # plot
+  p <- ggplot(edges_subset, aes(x=survnum, y=sn2, color=dyad))
+  p <- p + geom_point(size=point_size) + geom_line(aes(group=edges_subset$pair_id))
+  p <- p + theme(legend.position="none") + dyad_color + xlab("Suvey Number") + ylab("Relationship Strength")
+  p <- p + facet_wrap(~edges_subset$sender_final_id)
+  print(p)
+  # close the pdf
+  dev.off()
+}
+
+plot_outedges_dyadonly <- function(edges, semester_a, night_a, role_a, scale_factor=3, point_size=1){
+  # order them so lines plot correctly
+  edges <- edges[with(edges, order(semester, night, sender_final_id, receiver_final_id, survnum)),]
+  # get subset of edges
+  edges_subset <- edges[with(edges, semester==semester_a & night==night_a & sender_role==role_a & dyad==TRUE),]
+  # setup plot
+  grid_size <- as.integer(sqrt(length(unique(edges_subset$sender_final_id))))+1
+  filen <- paste(paste(paste(output_dir, "outedges_dyadonly", sep="") , semester_a, night_a, role_a, sep="_"), ".pdf", sep="")
+  pdf(filen, width=grid_size*scale_factor, height=grid_size*scale_factor)
+  # plot
+  p <- ggplot(edges_subset, aes(x=survnum, y=sn2, color=dyad))
+  p <- p + geom_point() + geom_line(aes(group=edges_subset$pair_id))
+  p <- p + theme(legend.position="none") + dyad_color + xlab("Suvey Number") + ylab("Relationship Strength")
+  print(p)
+  # close the pdf
+  dev.off()
 }
