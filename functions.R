@@ -1,6 +1,6 @@
 source("config.R")
 
-make_graph <- function(participants, edges, semester_a, night_a, strength_a, survey_no_a, sender_role=NA, receiver_role=NA, strength_mode="exact"){
+make_graph <- function(participants, edges, semester_a, night_a, strength_a, survey_no_a, sender_role=NA, receiver_role=NA, strength_mode="within", strength_err=0.5){
   # construct adjacency and vertices
   verts <- participants[with(participants, semester==semester_a & night==night_a), ]
   #verts <- participants[with(participants, semester==semester_a), ]
@@ -11,12 +11,12 @@ make_graph <- function(participants, edges, semester_a, night_a, strength_a, sur
   # what strength edges to include?
   if(strength_mode=="atleast"){
     adj <- adj[with(adj, sn2>=strength_a), ]
-  }
-  else if(strength_mode=="atmost"){
+  } else if(strength_mode=="atmost"){
     adj <- adj[with(adj, sn2<=strength_a), ]
-  }
-  else if(strength_mode=="exact"){
+  } else if(strength_mode=="exact"){
     adj <- adj[with(adj, sn2==strength_a), ]
+  } else if(strength_mode=="within"){
+    adj <- adj[with(adj, sn2<=strength_a + strength_err & sn2 >= strength_a - strength_err), ]
   } else {
     stop(paste("Invalid strength_mode:", strength_mode))
   }
@@ -137,10 +137,10 @@ day_ave_degree_plot <- function(degs, file_suffix, title_prefix, scale_factor, c
 
 
 plot_outedges_byperson <- function(edges, semester_a, night_a, role_a, scale_factor=3, point_size=0.5){
-  # order them so lines plot correctly
-  edges <- edges[with(edges, order(semester, night, sender_final_id, receiver_final_id, survnum)),]
   # get subset of edges
   edges_subset <- edges[with(edges, semester==semester_a & night==night_a & sender_role==role_a),]
+  # order them so lines plot correctly
+  edges_subset <- edges_subset[with(edges_subset, order(semester, night, sender_final_id, receiver_final_id, survnum)),]
   # setup plot
   grid_size <- as.integer(sqrt(length(unique(edges_subset$sender_final_id))))+1
   filen <- paste(paste(paste(output_dir, "outedges_byperson", sep="") , semester_a, night_a, role_a, sep="_"), ".pdf", sep="")
@@ -148,7 +148,8 @@ plot_outedges_byperson <- function(edges, semester_a, night_a, role_a, scale_fac
   # plot
   p <- ggplot(edges_subset, aes(x=survnum, y=sn2, color=dyad))
   p <- p + geom_point(size=point_size) + geom_line(aes(group=edges_subset$pair_id))
-  p <- p + theme(legend.position="none") + dyad_color + xlab("Suvey Number") + ylab("Relationship Strength")
+  p <- p + theme(legend.position="none", panel.grid.major.y=element_line(linetype=2, color="grey50")) + dyad_color + xlab("Suvey Number") + ylab("Relationship Strength")
+  p <- p + scale_y_continuous(breaks=seq(0,10,2)) + scale_x_continuous(breaks=seq(0,5,1))
   p <- p + facet_wrap(~edges_subset$sender_final_id)
   print(p)
   # close the pdf
@@ -156,10 +157,10 @@ plot_outedges_byperson <- function(edges, semester_a, night_a, role_a, scale_fac
 }
 
 plot_outedges_dyadonly <- function(edges, semester_a, night_a, role_a, scale_factor=3, point_size=1){
-  # order them so lines plot correctly
-  edges <- edges[with(edges, order(semester, night, sender_final_id, receiver_final_id, survnum)),]
   # get subset of edges
   edges_subset <- edges[with(edges, semester==semester_a & night==night_a & sender_role==role_a & dyad==TRUE),]
+  # order them so lines plot correctly
+  edges_subset <- edges_subset[with(edges_subset, order(semester, night, sender_final_id, receiver_final_id, survnum)),]
   # setup plot
   grid_size <- as.integer(sqrt(length(unique(edges_subset$sender_final_id))))+1
   filen <- paste(paste(paste(output_dir, "outedges_dyadonly", sep="") , semester_a, night_a, role_a, sep="_"), ".pdf", sep="")
@@ -167,8 +168,53 @@ plot_outedges_dyadonly <- function(edges, semester_a, night_a, role_a, scale_fac
   # plot
   p <- ggplot(edges_subset, aes(x=survnum, y=sn2, color=dyad))
   p <- p + geom_point() + geom_line(aes(group=edges_subset$pair_id))
-  p <- p + theme(legend.position="none") + dyad_color + xlab("Suvey Number") + ylab("Relationship Strength")
+  p <- p + theme(legend.position="none", panel.grid.major.y=element_line(linetype=2, color="grey50")) + dyad_color + xlab("Suvey Number") + ylab("Relationship Strength")
+  p <- p + scale_y_continuous(breaks=seq(0,10,2)) + scale_x_continuous(breaks=seq(0,5,1))
   print(p)
   # close the pdf
+  dev.off()
+}
+
+dyad_trajectory <- function(edges, semester_a, night_a, scale_factor=3, point_size=1){
+  # get subset of edges
+  edges_subset <- edges[with(edges, semester==semester_a & night==night_a & dyad==TRUE),]
+  # setup plot
+  edges_subset$dyad_id <- substr(edges_subset$sender_final_id, 2, 999)
+  # take only the columns we need
+  edges_subset <- edges_subset[, c("dyad_id", "sender_role", "survnum", "sn2")]
+  # reshape
+  edges_subset = dcast(edges_subset, dyad_id + survnum ~ sender_role, value.var="sn2", fun.aggregate=sum)
+  # order them so lines plot correctly
+  edges_subset <- edges_subset[with(edges_subset, order(dyad_id, survnum)),]
+ 
+  # plot each dyad separately 
+  grid_size <- as.integer(sqrt(length(unique(edges_subset$dyad_id))))+1
+  filen <- paste(paste(paste(output_dir, "dyad_trajectory", sep="") , semester_a, night_a, sep="_"), ".pdf", sep="")
+  pdf(filen, width=scale_factor*5, height=scale_factor*5)
+  # plot
+  colormap = palette(viridis(5, option="viridis"))
+  p <- ggplot(edges_subset, aes(x=mentee, y=mentor, color=as.factor(survnum)))
+  p <- p + geom_point() + geom_path(aes(group=edges_subset$dyad_id))
+  p <- p + theme(legend.position="bottom", panel.grid.major=element_line(linetype=2, color="grey25"), panel.border=element_rect(colour="black", fill=NA, size=1)) 
+  p <- p + labs(x="Mentee Strength", y="Mentor Strength", color="Survey Number")
+  p <- p + scale_y_continuous(breaks=seq(0,10,5), limits=c(0,10)) + scale_x_continuous(breaks=seq(0,10,5), limits=c(0,10))
+  p <- p + scale_color_manual(values=colormap)
+  p <- p + facet_wrap(~edges_subset$dyad_id)
+  print(p)
+  dev.off()
+ 
+  # plot average behavior instead
+  averages <- aggregate(edges_subset[,c("survnum", "mentor", "mentee")], by=list(edges_subset$survnum), FUN="mean")
+  filen <- paste(paste(paste(output_dir, "dyad_trajectory", sep="") , semester_a, night_a, sep="_"), "_average.pdf", sep="")
+  pdf(filen, width=scale_factor*3, height=scale_factor*3)
+  # plot
+  p <- ggplot(averages, aes(x=mentee, y=mentor, color=as.factor(survnum)))
+  p <- p + geom_point() + geom_path(color=as.factor(averages$survnum))
+  p <- p + theme(legend.position="bottom", panel.grid.major=element_line(linetype=2, color="grey25"), panel.border=element_rect(colour="black", fill=NA, size=1)) 
+  p <- p + labs(x="Mentee Strength", y="Mentor Strength", color="Survey Number")
+  p <- p + scale_y_continuous(breaks=seq(0,10,2), limits=c(0,10)) + scale_x_continuous(breaks=seq(0,10,2), limits=c(0, 10))
+  #p <- p + ylim(0, 10) + xlim(0, 10)
+  p <- p + scale_color_manual(values=colormap)
+  print(p)
   dev.off()
 }

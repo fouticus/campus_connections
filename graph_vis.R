@@ -17,7 +17,7 @@ om = scale_factor * 2
 par(mfrow=c(length(nights), length(strengths)), oma=c(om, om, om, om), mar=c(0, 0, 0, 0))
 for(night in nights){
   for(strength in strengths){
-    net <- make_graph(participants, edges, semester, night, strength, survey_no, strength_mode="exact")
+    net <- make_graph(participants, edges, semester, night, strength, survey_no, strength_mode="within", strength_err=0.5)
     plot_graph(net)
   }
 }
@@ -32,7 +32,7 @@ for(role in c("mentor", "mentee")){
   par(mfrow=c(length(nights), length(strengths)), oma=c(om, om, om, om), mar=c(0, 0, 0, 0))
   for(night in nights){
     for(strength in strengths){
-      net <- make_graph(participants, edges, semester, night, strength, survey_no, sender_role=role, strength_mode="exact")
+      net <- make_graph(participants, edges, semester, night, strength, survey_no, sender_role=role, strength_mode="within", strength_err=0.5)
       plot_graph(net)
     }
   }
@@ -49,7 +49,7 @@ for(night in nights){
   par(mfrow=c(length(survey_nos), length(strengths)), mar=c(0, 0, 0, 0), oma=c(om, om, om, om))
   for(survey_no in survey_nos){
     for(strength in strengths){
-      net <- make_graph(participants, edges, semester, night, strength, survey_no, strength_mode="exact")
+      net <- make_graph(participants, edges, semester, night, strength, survey_no, strength_mode="within", strength_err=0.5)
       plot_graph(net)
     }
   }
@@ -65,7 +65,7 @@ for(role in c("mentor", "mentee")){
     par(mfrow=c(length(survey_nos), length(strengths)), mar=c(0, 0, 0, 0), oma=c(om, om, om, om))
     for(survey_no in survey_nos){
       for(strength in strengths){
-        net <- make_graph(participants, edges, semester, night, strength, survey_no, sender_role=role, strength_mode="exact")
+        net <- make_graph(participants, edges, semester, night, strength, survey_no, sender_role=role, strength_mode="within", strength_err=0.5)
         plot_graph(net)
       }
     }

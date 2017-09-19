@@ -10,6 +10,7 @@ library(plyr)
 library(reshape2)
 library(grid)
 library(gridExtra)
+library(viridisLite)
 
 
 
@@ -28,7 +29,7 @@ dyad_colors = c("black", "red")
 
 #role_pallete <- brewer.pal(5,"Set1")
 role_pallete <- role_colors
-names(role_pallete) <- levels(participants$role)
+#names(role_pallete) <- levels(participants$role)
 role_fill <- scale_fill_manual(name = "role", values = role_pallete)
 role_color <- scale_color_manual(name = "role", values = role_pallete)
 sender_role_fill <- scale_fill_manual(name = "sender_role", values = role_pallete)
