@@ -6,13 +6,19 @@ source("config.R")
 
 # convert data to lowercase with python script
 pyscript = "python ../data/tolowercase.py"
-system(paste(pyscript, paste(data_dir, "CC_Edgelist_foutfixed.csv", sep="")))
+#system(paste(pyscript, paste(data_dir, "CC_Edgelist_foutfixed.csv", sep="")))
+#system(paste(pyscript, paste(data_dir, "CC_Edgelist.csv", sep="")))
+system(paste(pyscript, paste(data_dir, "CC_Edgelist_valid.csv", sep="")))
 system(paste(pyscript, paste(data_dir, "Mentee_Attributes.csv", sep="")))
 system(paste(pyscript, paste(data_dir, "Staff_Attributes.csv", sep="")))
 
+pyscript2 = "python ../data/valid_edges.py"
+system(pyscript)
+
 # load data
 #edges <- read.csv("../data/CC_Edgelist.csv")
-edges <- read.csv(paste(data_dir, "CC_Edgelist_foutfixed.csv", sep=""))
+#edges <- read.csv(paste(data_dir, "CC_Edgelist.csv", sep=""))
+edges <- read.csv(paste(data_dir, "CC_Edgelist_valid.csv", sep=""))
 mentees <- read.csv(paste(data_dir, "Mentee_Attributes.csv", sep=""))
 staff <- read.csv(paste(data_dir, "Staff_Attributes.csv", sep=""))
 
@@ -103,3 +109,16 @@ participants$final_id <- as.character(participants$final_id)
 
 staff = subset(participants, participants$role != "mentee")
 mentees = subset(participants, participants$role == "mentee")
+
+# create valid edges dataset
+valid_edges <- edges[with(edges, sender_missing==0 & receiver_missing==0 & sn1==1 & !is.na(sn2) & sender_final_id!=receiver_final_id), ]
+roles <- participants[,c("final_id", "role", "night")]
+valid_edges <- merge(valid_edges, roles, by.x=c("sender_final_id", "night"), by.y=c("final_id", "night"))
+colnames(valid_edges)[length(colnames(valid_edges))] <- "sender_role"
+valid_edges <- merge(valid_edges, roles, by.x=c("receiver_final_id", "night"), by.y=c("final_id", "night"))
+colnames(valid_edges)[length(colnames(valid_edges))] <- "receiver_role"
+valid_edges$pair_id <- paste(valid_edges$sender_final_id, valid_edges$receiver_final_id, sep="->")
+valid_edges$dyad <- substr(valid_edges$sender_final_id, 2, 999) == substr(valid_edges$receiver_final_id, 2, 999)
+
+valid_edges$sender_role=factor(valid_edges$sender_role, levels=role_labels)
+valid_edges$receiver_role=factor(valid_edges$receiver_role, levels=role_labels)

@@ -3,8 +3,6 @@ source("functions.R")
 
 
 # get statistics for various types of graphs
-#semesters <- c("Fa15", "Sp16", "Fa16", "Sp17")
-semesters <- c("Fa15")
 nights <- c("Mon", "Tue", "Wed", "Thu")
 strengths <- 0:10
 survey_nos <- 1:5
@@ -56,13 +54,13 @@ plot_cols <- 2
 colfunc <- colorRampPalette(c("black", "green", "red"))
 colfunc <- function(n){return(rgb(0, 0, 0, 1:n/n))}
 
-#day_degree_plot(degs, "deg", "Degree", scale_factor, om, ma, plot_rows, plot_cols, colfunc, semesters, nights, strengths, survey_nos, max_deg)
-#day_degree_plot(mentor_degs, "mentor_deg", "Mentor Degree", scale_factor, om, ma, plot_rows, plot_cols, colfunc, semesters, nights, strengths, survey_nos, max_deg)
-#day_degree_plot(mentor_in_degs, "mentor_in_deg", "Mentor In-Degree", scale_factor, om, ma, plot_rows, plot_cols, colfunc, semesters, nights, strengths, survey_nos, max_deg)
-#day_degree_plot(mentor_out_degs, "mentor_out_deg", "Mentor Out-Degree", scale_factor, om, ma, plot_rows, plot_cols, colfunc, semesters, nights, strengths, survey_nos, max_deg)
-#day_degree_plot(mentee_degs, "mentee_deg", "Mentee Degree", scale_factor, om, ma, plot_rows, plot_cols, colfunc, semesters, nights, strengths, survey_nos, max_deg)
-#day_degree_plot(mentee_in_degs, "mentee_in_deg", "Mentee In-Degree", scale_factor, om, ma, plot_rows, plot_cols, colfunc, semesters, nights, strengths, survey_nos, max_deg)
-#day_degree_plot(mentee_out_degs, "mentee_out_deg", "Mentee Out-Degree", scale_factor, om, ma, plot_rows, plot_cols, colfunc, semesters, nights, strengths, survey_nos, max_deg)
+day_degree_plot(degs, "deg", "Degree", scale_factor, om, ma, plot_rows, plot_cols, colfunc, semesters, nights, strengths, survey_nos, max_deg)
+day_degree_plot(mentor_degs, "mentor_deg", "Mentor Degree", scale_factor, om, ma, plot_rows, plot_cols, colfunc, semesters, nights, strengths, survey_nos, max_deg)
+day_degree_plot(mentor_in_degs, "mentor_in_deg", "Mentor In-Degree", scale_factor, om, ma, plot_rows, plot_cols, colfunc, semesters, nights, strengths, survey_nos, max_deg)
+day_degree_plot(mentor_out_degs, "mentor_out_deg", "Mentor Out-Degree", scale_factor, om, ma, plot_rows, plot_cols, colfunc, semesters, nights, strengths, survey_nos, max_deg)
+day_degree_plot(mentee_degs, "mentee_deg", "Mentee Degree", scale_factor, om, ma, plot_rows, plot_cols, colfunc, semesters, nights, strengths, survey_nos, max_deg)
+day_degree_plot(mentee_in_degs, "mentee_in_deg", "Mentee In-Degree", scale_factor, om, ma, plot_rows, plot_cols, colfunc, semesters, nights, strengths, survey_nos, max_deg)
+day_degree_plot(mentee_out_degs, "mentee_out_deg", "Mentee Out-Degree", scale_factor, om, ma, plot_rows, plot_cols, colfunc, semesters, nights, strengths, survey_nos, max_deg)
 
 
 colrs <- c("red", "blue", "green", "orange")
@@ -76,3 +74,10 @@ day_ave_degree_plot(mentor_out_degs, "mentor_out", "Mentor Out-Degree", scale_fa
 day_ave_degree_plot(mentee_degs, "mentee", "Mentee Degree", scale_factor, colrs, semesters, nights, strengths, survey_nos, max_deg)
 day_ave_degree_plot(mentee_in_degs, "mentee_in", "Mentee In-Degree", scale_factor, colrs, semesters, nights, strengths, survey_nos, max_deg)
 day_ave_degree_plot(mentee_out_degs, "mentee_out", "Mentee Out-Degree", scale_factor, colrs, semesters, nights, strengths, survey_nos, max_deg)
+
+
+for(i in 1:length(semesters)){
+  for(j in 1:length(nights)){
+    strength_histo(valid_edges, semesters[i], nights[j], scale_factor=2)
+  }
+}

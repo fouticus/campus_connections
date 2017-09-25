@@ -1,8 +1,6 @@
 library(ggplot2)
 library(RColorBrewer)
-
 library(igraph)
-
 library(gmodels)
 library(gtools)
 library(stringr)
@@ -12,16 +10,22 @@ library(grid)
 library(gridExtra)
 library(viridisLite)
 
-
-
-theme_set(theme_classic())
+### Directories
 output_dir <- "../output/"
 data_dir <- "../data/"
 
 
+### Which semesters we are looking at right now.
+#semesters <- c("Fa15", "Sp16", "Fa16", "Sp17")
+semesters = c("Fa15")
+
+
+### Plot settings
+theme_set(theme_classic())
 #               mentor, coach, instr, lead, mentee
 role_colors = c("red", "green", "purple", "yellow", "blue")
-#roles = c("mentor", "mentee", "instr", "lead", "coach")
+role_colors2 = c("red", "blue", "yellow", "purple", "green")
+role_labels = c("mentor", "mentee", "instr", "lead", "coach")
 gender2_colors = c("grey", "pink", "cyan")
 gender3_colors = c("pink", "cyan")
 dyad_colors = c("black", "red")
@@ -41,3 +45,6 @@ dyad_pallete <- dyad_colors
 names(dyad_pallete) <- c(FALSE, TRUE)
 dyad_fill <- scale_fill_manual(name = "dyad", values = dyad_pallete)
 dyad_color <- scale_color_manual(name = "dyad", values = dyad_pallete)
+
+
+
