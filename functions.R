@@ -1,13 +1,16 @@
 source("config.R")
 
-make_graph <- function(participants, edges, semester_a, night_a, strength_a, survey_no_a, sender_role=NA, receiver_role=NA, strength_mode="within", strength_err=0.5){
+make_graph <- function(participants, edges, semester_a, night_a, strength_a, survey_no_a=NA, sender_role=NA, receiver_role=NA, strength_mode="within", strength_err=0.5){
   # construct adjacency and vertices
-  verts <- participants[with(participants, semester==semester_a & night==night_a), ]
+  verts <- participants[which(with(participants, semester==semester_a & night==night_a)), ]
   #verts <- participants[with(participants, semester==semester_a), ]
   #verts <- subset(verts, !duplicated(verts$final_id))
   #verts <- unique(verts, incomparables=colnames(verts)[2:length(colnames)])
   
-  adj <- edges[with(edges, semester==semester_a & survnum==survey_no_a & night==night_a & sender_missing==0 & receiver_missing==0 & sn1==1 & !is.na(sn1) & !is.na(sn2)), ]
+  adj <- edges[which(with(edges, semester==semester_a & night==night_a & sender_missing==0 & receiver_missing==0 & sn1==1 & !is.na(sn1) & !is.na(sn2))), ]
+  if(!is.na(survey_no_a)){
+    adj <- adj[which(with(adj, survnum==survey_no_a )), ]
+  }
   # what strength edges to include?
   if(strength_mode=="atleast"){
     adj <- adj[with(adj, sn2>=strength_a), ]
@@ -35,7 +38,9 @@ make_graph <- function(participants, edges, semester_a, night_a, strength_a, sur
     adj <- tmp_adj[tmp_adj$role==receiver_role,]
   }
   # reorder columns to work with igraph
-  adj <- adj[c(2, 5, 1, 3:4, 6:ncol(adj))]
+  edge_columns <- c("sender_final_id", "receiver_final_id")
+  other_columns <- colnames(adj)[!colnames(adj) %in% edge_columns]
+  adj <- adj[, c(edge_columns, other_columns)]
   
   # check that all necessry vertices exist
   v_ids <- unique(verts$final_id)
@@ -47,6 +52,7 @@ make_graph <- function(participants, edges, semester_a, night_a, strength_a, sur
   if(!all(er_ids %in% v_ids)){
     print(paste("Receiver IDs not in vertices:", toString(subset(er_ids, !(er_ids %in% v_ids)))))
   }
+  
   
   # create network
   net <- graph_from_data_frame(adj, vertices=verts)
@@ -140,17 +146,27 @@ plot_outedges_byperson <- function(edges, semester_a, night_a, role_a, scale_fac
   # get subset of edges
   edges_subset <- edges[with(edges, semester==semester_a & night==night_a & sender_role==role_a),]
   # order them so lines plot correctly
-  edges_subset <- edges_subset[with(edges_subset, order(semester, night, sender_final_id, receiver_final_id, survnum)),]
+  #edges_subset <- edges_subset[with(edges_subset, order(sender_final_id, !dyad, receiver_final_id, survnum)),]
+  edges_subset <- edges_subset[with(edges_subset, order(sender_final_id, receiver_final_id, survnum)),]
   # setup plot
   grid_size <- as.integer(sqrt(length(unique(edges_subset$sender_final_id))))+1
   filen <- paste(paste(paste(output_dir, semester_a, "_outedges_byperson", sep="") , night_a, role_a, sep="_"), ".pdf", sep="")
   pdf(filen, width=grid_size*scale_factor, height=grid_size*scale_factor)
   # plot
-  p <- ggplot(edges_subset, aes(x=survnum, y=sn2, color=dyad))
-  p <- p + geom_point(size=point_size, aes(alpha=alpha_a)) + geom_line(aes(group=edges_subset$pair_id, alpha=alpha_a))
+  #dyad_edges = subset(edges_subset, dyad==TRUE)
+  #non_dyad_edges = subset(edges_subset, dyad==FALSE)
+  #pd <- position_dodge(0.1)
+  p <- ggplot(edges_subset, aes(x=survnum, y=sn2, color=dyad, group=receiver_final_id))
+  #p <- ggplot(edges_subset)
+  #p <- p + geom_point(aes(x=survnum, y=sn2), data=non_dyad_edges, alpha=alpha_a, size=point_size, position=pd)
+  #p <- p + geom_line(aes(x=survnum, y=sn2, group=pair_id), data=non_dyad_edges, alpha=alpha_a, position=pd)
+  #p <- p + geom_point(aes(x=survnum, y=sn2), data=dyad_edges, alpha=alpha_a, size=point_size, position=pd)
+  #p <- p + geom_line(data=dyad_edges, aes(x=survnum, y=sn2, group=pair_id), alpha=alpha_a, position=pd)
+  p <- p + geom_point(alpha=alpha_a, size=point_size)
+  p <- p + geom_line(alpha=alpha_a)
   p <- p + theme(legend.position="none", panel.grid.major.y=element_line(linetype=2, color="grey50")) + dyad_color + xlab("Suvey Number") + ylab("Relationship Strength")
   p <- p + scale_y_continuous(breaks=seq(0,10,2)) + scale_x_continuous(breaks=seq(0,5,1))
-  p <- p + facet_wrap(~edges_subset$sender_final_id)
+  p <- p + facet_wrap(~sender_final_id)
   p <- p + scale_alpha(guide="none")    
   print(p)
   # close the pdf
@@ -168,7 +184,7 @@ plot_outedges_dyadonly <- function(edges, semester_a, night_a, role_a, scale_fac
   pdf(filen, width=grid_size*scale_factor, height=grid_size*scale_factor)
   # plot
   p <- ggplot(edges_subset, aes(x=survnum, y=sn2, color=dyad))
-  p <- p + geom_point(aes(alpha=alpha_a)) + geom_line(aes(group=edges_subset$pair_id, alpha=alpha_a))
+  p <- p + geom_point(alpha=alpha_a) + geom_line(aes(group=edges_subset$pair_id), alpha=alpha_a)
   p <- p + theme(legend.position="none", panel.grid.major.y=element_line(linetype=2, color="grey50")) + dyad_color + xlab("Suvey Number") + ylab("Relationship Strength")
   p <- p + scale_y_continuous(breaks=seq(0,10,2)) + scale_x_continuous(breaks=seq(0,5,1))
   p <- p + scale_alpha(guide="none")    
