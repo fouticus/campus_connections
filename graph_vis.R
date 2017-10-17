@@ -12,10 +12,10 @@ strengths_labels <- c("[0, 0.5)", "[0.5, 1.5)", "[1.5, 2.5)", "[2.5, 3.5)", "[3.
 survey_nos <- 1:5;
 
 # decide which things to do:
-do_surv5           <- FALSE
-do_surv5_roles     <- FALSE
-do_all_survs       <- FALSE
-do_all_survs_roles <- FALSE
+do_surv5           <- TRUE
+do_surv5_roles     <- TRUE
+do_all_survs       <- TRUE
+do_all_survs_roles <- TRUE
 do_end_state       <- TRUE
 do_end_state_roles <- TRUE
 

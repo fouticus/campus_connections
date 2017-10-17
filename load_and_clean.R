@@ -5,8 +5,9 @@ gc()
 source("config.R")
 
 file_suffix <- "_09.27.17"
-edgelist_file <- paste("CC_Edgelist", file_suffix, ".csv", sep="")
-valid_edgelist_file <- paste("CC_Edgelist_valid", file_suffix, ".csv", sep="")
+file_suffix2 <- "_10.13.17"
+edgelist_file <- paste("CC_Edgelist", file_suffix2, ".csv", sep="")
+valid_edgelist_file <- paste("CC_Edgelist_valid", file_suffix2, ".csv", sep="")
 mentee_atr_file <- paste("Mentee_Attributes", file_suffix, ".csv", sep="")
 staff_atr_file <- paste("Staff_Attributes", file_suffix, "_fout.csv", sep="")
 conditions_file <- paste("TX_Assign_fout", ".csv", sep="")
