@@ -200,8 +200,45 @@ nonedges_endstate$dyad <- substr(nonedges_endstate$sender_final_id, 2, 999) == s
 ### Load some supplemental data
 conditions <- read.csv(paste(data_dir, conditions_file, sep=""))
 conditions <- add_edge_labels(conditions)
+colnames(conditions)[3] <- "mfam_night"
 mentee_master <- read.csv(paste(data_dir, mentee_master_file, sep=""))
-#mentor_master <- read.csv(paste(data_dir, mentor_master_file, sep=""))
+#staff_master <- read.csv(paste(data_dir, mentor_master_file, sep=""))
+
+### family id from supplemental data
+smart_join <- function(df1, df2, splitsize=1000){
+  merged_dfs <- list()
+  for(i in 1:ceiling(dim(df1)[1]/splitsize)){
+    merged_dfs[[i]] <- join(df1[(splitsize*(i-1)+1):min(dim(df1)[1],(splitsize*i)),], df2)
+    #if(!exists("merged_df")){
+    #  merged_df <- join(df1[1:splitsize,], df2)
+    #} else {
+    #  merged_df <- rbind(merged_df, join(df1[(splitsize*(i-1)+1):min(dim(df1)[1],(splitsize*i)),], df2))
+    #}
+  }
+  merged_df <- do.call("rbind", merged_dfs)
+  return(merged_df)
+}
+add_fam_id <- function(df){
+  mentee_family_ids <- mentee_master[, c("final_id", "menfamid")]
+  fam_labels <- levels(mentee_family_ids$menfamid)
+  fam_labels <- c(fam_labels[2:length(fam_labels)], "")  # "" (empty string) label is at front of list, but NA's use the last label, so move to end
+  mentee_family_ids$menfamid <- as.numeric(mentee_family_ids$menfamid)
+  
+  colnames(mentee_family_ids) <- c("sender_final_id", "sender_mentee_fam_id")
+  df <- smart_join(df, mentee_family_ids)
+  colnames(mentee_family_ids) <- c("receiver_final_id", "receiver_mentee_fam_id")
+  df <- smart_join(df, mentee_family_ids)
+  
+  mentor_family_ids <- data.frame("receiver_final_id"=sapply(mentee_family_ids[,"receiver_final_id"], FUN=function(x) paste("m",substr(x, 2, 100000),sep="")), "receiver_mentor_fam_id"=as.numeric(mentee_family_ids[,"receiver_mentee_fam_id"]))
+  df <- smart_join(df, mentor_family_ids)
+  colnames(mentor_family_ids) <- c("sender_final_id", "sender_mentor_fam_id")
+  df <- smart_join(df, mentor_family_ids)
+  
+  df$sender_fam_id <- as.character(factor(rowMeans(df[, c("sender_mentor_fam_id", "sender_mentee_fam_id")], na.rm=TRUE), labels=fam_labels))
+  df$receiver_fam_id <- as.character(factor(rowMeans(df[, c("receiver_mentor_fam_id", "receiver_mentee_fam_id")], na.rm=TRUE), labels=fam_labels))
+  df[, c("sender_mentor_fam_id", "sender_mentee_fam_id", "receiver_mentor_fam_id", "receiver_mentee_fam_id")] <- list(NULL)
+  return(df)
+}
 
 # gender information
 add_gender <- function(df){
@@ -224,19 +261,21 @@ add_gender <- function(df){
 }
 
 
-
-# add gender information to end_state edge lists
-edges_endstate <- add_gender(edges_endstate)
-nonedges_endstate <- add_gender(nonedges_endstate)
-
-# Mentor family information
-edges_endstate <- join(edges_endstate, conditions)
-nonedges_endstate <- join(nonedges_endstate, conditions)
-
-
 ### remove_things that pollute the environment
 rm(edges_45)
 rm(count_45)
 rm(present_45)
 rm(relation_present)
 rm(p45_sem_night)
+
+# add gender information to end_state edge lists
+edges_endstate <- add_gender(edges_endstate)
+nonedges_endstate <- add_gender(nonedges_endstate)
+
+# Mentor family information
+edges_endstate <- add_fam_id(edges_endstate)
+nonedges_endstate <- add_fam_id(nonedges_endstate)
+
+# conditions
+edges_endstate <- join(edges_endstate, conditions)
+nonedges_endstate <- join(nonedges_endstate, conditions)
