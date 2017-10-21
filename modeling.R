@@ -72,22 +72,28 @@ create_indicators <- function(X){
 }
 
 logistic_model <- function(df, form, pred_cases, do=c("summary", "anova", "conf", "R2", "plot", "roc", "resid"), sp=0.5, jit=1, alpha=0){
+  ret_env <- new.env()
+  vars <- all.vars(form)
   # construct model object
   m <- glm(form, family=binomial(link='logit'), data=df)
   m_null <- glm(edge~1, family=binomial(link='logit'),data=df)
+  ret_env$m <- m
   if("summary" %in% do){
-    print(summary(m))
+    ret_env$summary <- summary(m)
+    print(ret_env$summary)
   }
   if("anova" %in% do){
-    print(anova(m))
+    ret_env$anova <- anova(m)
+    print(ret_env$anova)
   }
   if("conf" %in% do){
-    print(exp(confint(m)))
+    ret_env$conf <- exp(confint(m))
+    print(ret_env$conf)
   }
   if("R2" %in% do){
     # mcfadden R2
-    mfr2 <- 1-logLik(m)/logLik(m_null)
-    writeLines(c("","McFadden R2:", round(mfr2, 2)))
+    ret_env$mfr2 <- 1-logLik(m)/logLik(m_null)
+    writeLines(c("","McFadden R2:", round(ret_env$mfr2, 2)))
   }
   if("roc" %in% do){
     # roc curve
@@ -109,22 +115,33 @@ logistic_model <- function(df, form, pred_cases, do=c("summary", "anova", "conf"
     #loess(predict(m, type="response") ~ residuals(m))
   }
   if("obs" %in% do){
-    X_obs2 <- aggregate(edge ~ I_same_gender + I_same_dyad + I_same_mfam_diff_dyad, data=X_sub, FUN=length)
+    sum_form <- formula(paste(vars[1], "~", paste(vars[2:length(vars)], collapse=" + ")))
+    X_obs  <- aggregate(sum_form, data=df, FUN=mean)
+    X_obs2 <- aggregate(sum_form, data=df, FUN=length)
+    colnames(X_obs)[length(names(X_obs))] <- "observed_prob"
     colnames(X_obs2)[length(names(X_obs2))] <- "counts"
     X_obs <- join(X_obs, X_obs2)
-    #X_obs <- merge(X_obs, X_obs2, by=cI_sender_mentee_female + I_sender_mentee_male + I_receiver_mentee_female + I_receiver_mentee_male + I_same_dyad + I_same_mfam_diff_dyad, data=X_sub)
-    rm(X_obs2)
-    X_obs
+    ret_env$X_obs <- X_obs
+    if(!("pred" %in% do)){
+      print(X_obs)
+    }
   }
   if("pred" %in% do){
-    X_obs <- aggregate(form, data=df, FUN=mean)
-    X_obs2 <- aggregate(form, data=df, FUN=length)
-    X_pred <- expand.grid(c(0,1), c(0,1), c(0,1), c(0,1), c(0,1), c(0,1))
-    colnames(X_pred) <- colnames(X_obs)[1:(dim(X_obs)[2]-2)]
-    X_pred[, "prob"] <- predict(m, X_pred, type="response")
-    X_pred
+    X_pred <- pred_cases
+    colnames(X_pred) <- vars[2:length(vars)]
+    X_pred$predicted_prob <- predict(m, X_pred, type="response")
+    ret_env$X_pred <- X_pred
+    if(!("obs" %in% do)){
+      print(X_pred)
+    }
   }
-  return(m)
+  if("pred" %in% do & "obs" %in% do){
+    X_comb <- join(X_pred, X_obs, type='full')
+    X_comb$diff <- X_comb$observed_prob - X_comb$predicted_prob
+    ret_env$X_comb <- X_comb
+    print(X_comb)
+  }
+  return(ret_env)
 }
 
 X1 <- create_indicators(X1)
@@ -142,23 +159,35 @@ Xe2e <- X[X$I_sender_gender_defined * X$I_receiver_gender_defined == 1 & X$I_sen
 Xr2e <- X[X$I_sender_gender_defined * X$I_receiver_gender_defined == 1 & X$I_sender_ment == 1 & X$I_receiver_ment == 1 & X$I_mentor2mentee,]
 Xr2r <- X[X$I_sender_gender_defined * X$I_receiver_gender_defined == 1 & X$I_sender_ment == 1 & X$I_receiver_ment == 1 & X$I_mentor2mentor,]
 f1 <- formula("edge ~ I_same_gender + I_same_dyad * I_mfam_night + I_same_mfam_diff_dyad * I_mfam_night")
-todo <- c("summary", "conf", "resid", "R2", "ROC")
+#todo <- c("summary", "conf", "resid", "R2", "ROC")
+todo <- c("summary", "conf", "resid", "plot", "R2", "ROC", "obs", "pred")
+#todo <- c("obs", "pred")
 al <- 0.01
 jitter <- 0.05
-m <- logistic_model(Xe2r, f1, do=todo, sp=1, jit=jitter, alpha=al)
-m <- logistic_model(Xr2e, f1, do=todo, sp=1, jit=jitter, alpha=al)
+pred_cases <- data.frame(rbind(c(0, 0, 0, 0),
+                               c(0, 1, 0, 0),
+                               c(0, 0, 0, 1),
+                               c(1, 0, 0, 0),
+                               c(1, 1, 0, 0),
+                               c(1, 0, 0, 1),
+                               c(0, 0, 1, 0),
+                               c(0, 1, 1, 0),
+                               c(0, 0, 1, 1),
+                               c(1, 0, 1, 0),
+                               c(1, 1, 1, 0),
+                               c(1, 0, 1, 1)))
+m_e2r <- logistic_model(Xe2r, f1, pred_cases, do=todo, sp=1, jit=jitter, alpha=al)
+m_r2e <- logistic_model(Xr2e, f1, pred_cases, do=todo, sp=1, jit=jitter, alpha=al)
 
+pred_cases2 <- data.frame(rbind(c(0, 0, 0),
+                               c(1, 0, 0),
+                               c(0, 1, 0),
+                               c(0, 0, 1),
+                               c(0, 1, 1),
+                               c(1, 0, 0),
+                               c(1, 1, 0),
+                               c(1, 0, 1),
+                               c(1, 1, 1)))
 f2 <- formula("edge ~ I_same_gender + I_same_mfam_diff_dyad * I_mfam_night")
-m <- logistic_model(Xe2e, f2, do=todo, sp=1, jit=jitter, alpha=al)
-m <- logistic_model(Xr2r, f2, do=todo, sp=1, jit=jitter, alpha=al)
-
-
-
-#X_pred <- expand.grid(c(0,1), c(0,1), c(0,1), c(0,1), c(0,1), c(0,1))
-X_pred <- as.data.frame(matrix(c()))
-X_pred <- expand.grid(c(0,1), c(0,1), c(0,1), c(0,1), c(0,1), c(0,1))
-colnames(X_pred) <- colnames(X_obs)[1:(dim(X_obs)[2]-2)]
-#X_pred <- set_types(X_pred)
-
-X_pred[, "prob"] <- predict(m, X_pred, type="response")
-X_pred
+m_e2e <- logistic_model(Xe2e, f2, pred_cases2, do=todo, sp=1, jit=jitter, alpha=al)
+m_r2r <- logistic_model(Xr2r, f2, pred_cases2, do=todo, sp=1, jit=jitter, alpha=al)
