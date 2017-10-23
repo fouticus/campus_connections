@@ -144,6 +144,25 @@ logistic_model <- function(df, form, pred_cases, do=c("summary", "anova", "conf"
   return(ret_env)
 }
 
+write_model_results <- function(m, fname, items=NA){
+  f<-file(paste(output_dir, fname, ".txt", sep=""))
+  if(is.na(items)){
+    items <- sort(names(m))
+  }
+  sink(file=f)
+  print(fname)
+  for(item in items){
+    #write(str(m[[item]]), f)
+    #dput(m[[item]], f)
+    if(item != "m"){
+      writeLines(c(" ", paste("###############", item, "###############", " ")), con=f)
+      print(m[[item]])
+    }
+  }
+  sink()
+  close(f)
+}
+
 X1 <- create_indicators(X1)
 X0 <- create_indicators(X0)
 
@@ -158,9 +177,8 @@ Xe2r <- X[X$I_sender_gender_defined * X$I_receiver_gender_defined == 1 & X$I_sen
 Xe2e <- X[X$I_sender_gender_defined * X$I_receiver_gender_defined == 1 & X$I_sender_ment == 1 & X$I_receiver_ment == 1 & X$I_mentee2mentee,]
 Xr2e <- X[X$I_sender_gender_defined * X$I_receiver_gender_defined == 1 & X$I_sender_ment == 1 & X$I_receiver_ment == 1 & X$I_mentor2mentee,]
 Xr2r <- X[X$I_sender_gender_defined * X$I_receiver_gender_defined == 1 & X$I_sender_ment == 1 & X$I_receiver_ment == 1 & X$I_mentor2mentor,]
-f1 <- formula("edge ~ I_same_gender + I_same_dyad * I_mfam_night + I_same_mfam_diff_dyad * I_mfam_night")
-#todo <- c("summary", "conf", "resid", "R2", "ROC")
-todo <- c("summary", "conf", "resid", "plot", "R2", "ROC", "obs", "pred")
+#todo <- c("summary", "conf", "resid", "plot", "R2", "ROC", "obs", "pred")
+todo <- c("summary", "conf", "R2", "obs", "pred")
 #todo <- c("obs", "pred")
 al <- 0.01
 jitter <- 0.05
@@ -176,9 +194,6 @@ pred_cases <- data.frame(rbind(c(0, 0, 0, 0),
                                c(1, 0, 1, 0),
                                c(1, 1, 1, 0),
                                c(1, 0, 1, 1)))
-m_e2r <- logistic_model(Xe2r, f1, pred_cases, do=todo, sp=1, jit=jitter, alpha=al)
-m_r2e <- logistic_model(Xr2e, f1, pred_cases, do=todo, sp=1, jit=jitter, alpha=al)
-
 pred_cases2 <- data.frame(rbind(c(0, 0, 0),
                                c(1, 0, 0),
                                c(0, 1, 0),
@@ -188,6 +203,95 @@ pred_cases2 <- data.frame(rbind(c(0, 0, 0),
                                c(1, 1, 0),
                                c(1, 0, 1),
                                c(1, 1, 1)))
+f1 <- formula("edge ~ I_same_gender + I_same_dyad * I_mfam_night + I_same_mfam_diff_dyad * I_mfam_night")
 f2 <- formula("edge ~ I_same_gender + I_same_mfam_diff_dyad * I_mfam_night")
+m_e2r <- logistic_model(Xe2r, f1, pred_cases, do=todo, sp=1, jit=jitter, alpha=al)
+m_r2e <- logistic_model(Xr2e, f1, pred_cases, do=todo, sp=1, jit=jitter, alpha=al)
 m_e2e <- logistic_model(Xe2e, f2, pred_cases2, do=todo, sp=1, jit=jitter, alpha=al)
 m_r2r <- logistic_model(Xr2r, f2, pred_cases2, do=todo, sp=1, jit=jitter, alpha=al)
+write_model_results(m_e2r, "LR_results_Mentee2Mentor")
+write_model_results(m_r2e, "LR_results_Mentor2Mentee")
+write_model_results(m_e2e, "LR_results_Mentee2Mentee")
+write_model_results(m_r2r, "LR_results_Mentor2Mentor")
+
+todo <- c("summary", "conf", "obs")
+for(sem in c("Fa15", "Sp16", "Fa16", "Sp17")){
+  for(nigt in c("Mon", "Tue", "Wed", "Thu")){
+    print(paste("####  Semester:", sem, "  Night:", nigt, " ####"))
+    Xsn <- X[X$semester == sem & X$night == nigt & X$I_sender_gender_defined * X$I_receiver_gender_defined == 1 &  X$I_sender_ment ==1 & X$I_receiver_ment == 1,]
+    Xe2r <- Xsn[Xsn$I_mentee2mentor,]
+    Xe2e <- Xsn[Xsn$I_mentee2mentee,]
+    Xr2e <- Xsn[Xsn$I_mentor2mentee,]
+    Xr2r <- Xsn[Xsn$I_mentor2mentor,]
+    f4 <- formula("edge ~ I_same_gender + I_same_mfam_diff_dyad + I_same_dyad")
+    m_e2r <- logistic_model(Xe2r, f4, do=todo, sp=1, jit=jitter, alpha=al)
+    m_r2e <- logistic_model(Xr2e, f4, do=todo, sp=1, jit=jitter, alpha=al)
+    f5 <- formula("edge ~ I_same_gender + I_same_mfam_diff_dyad")
+    m_e2e <- logistic_model(Xe2e, f5, do=todo, sp=1, jit=jitter, alpha=al)
+    m_r2r <- logistic_model(Xr2r, f5, do=todo, sp=1, jit=jitter, alpha=al)
+    readline(prompt="Press [enter] to continue")
+  }
+}
+
+    
+    
+#####################  Per Night  ################################
+    
+pred_cases3 <- data.frame(rbind(c(0, 0, 0, 0, 0, 0),
+                                c(0, 0, 0, 0, 0, 1),
+                                c(1, 0, 0, 0, 0, 0),
+                                c(1, 0, 0, 0, 0, 1),
+                                c(1, 0, 0, 0, 1, 0),
+                                c(0, 1, 0, 0, 0, 0),
+                                c(0, 1, 0, 0, 0, 1),
+                                c(0, 1, 0, 0, 1, 0),
+                                c(0, 0, 1, 0, 0, 0),
+                                c(0, 0, 1, 0, 0, 1),
+                                c(0, 0, 1, 0, 1, 0),
+                                c(1, 0, 1, 0, 0, 0),
+                                c(1, 0, 1, 0, 0, 1),
+                                c(0, 1, 1, 0, 0, 0),
+                                c(0, 1, 1, 0, 0, 1),
+                                c(0, 0, 0, 1, 0, 0),
+                                c(0, 0, 0, 1, 0, 1),
+                                c(0, 0, 0, 1, 1, 0),
+                                c(1, 0, 0, 1, 0, 0),
+                                c(1, 0, 0, 1, 0, 1),
+                                c(0, 1, 0, 1, 0, 0),
+                                c(0, 1, 0, 1, 0, 1)))
+#todo <- c("summary", "conf", "resid", "R2", "ROC", "obs", "pred")
+todo <- c("summary", "conf", "R2", "obs", "pred")
+#todo <- c("summary", "conf", "resid", "R2", "obs", "pred")
+f3 <- formula("edge ~ I_sender_mentee_male + I_sender_mentee_female + I_receiver_mentee_male + I_receiver_mentee_female + I_sender_mentee_male*I_receiver_mentee_male + I_sender_mentee_female*I_receiver_mentee_male + I_sender_mentee_male*I_receiver_mentee_female + I_sender_mentee_female*I_receiver_mentee_female + I_same_dyad + I_same_mfam_diff_dyad")
+ms <- list()
+for(sem in c("Fa15", "Sp16", "Fa16", "Sp17")){
+  for(nigt in c("Mon", "Tue", "Wed", "Thu")){
+    # determine if mfam condition or not
+    Xsn <- X[X$I_sender_gender_defined * X$I_receiver_gender_defined == 1 & X$I_sender_ment == 1 & X$I_receiver_ment == 1 & X$semester == sem & X$night == nigt,]
+    mfam <- if(Xsn$mfam_night[1] == 1) "Yes" else "No"
+    print(paste("mfam?", mfam))
+    m <- logistic_model(Xsn, f3, pred_cases3, todo, sp=1, jit=jitter, alpha=al)
+    m$mfam <- mfam
+    m$name <- paste("LR_results", sem, nigt, sep="_")
+    write_model_results(m, m$name)
+    #readline(prompt="Press [enter] to continue")
+    ms <- c(ms, m)
+  }
+}
+master <- NA
+for(m in ms){
+  X_comb <- m$X_comb
+  #n_cols <- length(colnames(X_comb))
+  #colnames(X_comb)[[n_cols-3]] <- paste("p_pred", m$name, sep="_")
+  #colnames(X_comb)[[n_cols-2]] <- paste("p_obs", m$name, sep="_")
+  #colnames(X_comb)[[n_cols-1]] <- paste("count", m$name, sep="_")
+  #colnames(X_comb)[[n_cols]] <- paste("diff", m$name, sep="_")
+  X_comb$name <- m$name
+  if(is.na(master)){
+    master <- X_comb
+  } else {
+    #master <- join(master, X_comb)
+    master <- rbind(master, X_comb)
+  }
+}
+write.csv(master, paste(output_dir, "LR_results_by_night_pred_obs.csv", sep=""))

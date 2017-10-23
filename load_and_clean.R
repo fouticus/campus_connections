@@ -189,6 +189,8 @@ for(sem in unique(present_45$semester)){
 # compute pair id and exclude edges in the edges_endstate set
 nonedges_endstate$pair_id <- paste(nonedges_endstate$sender_final_id, nonedges_endstate$receiver_final_id, sep="->")
 nonedges_endstate <- anti_join(nonedges_endstate, edges_endstate, by=c("pair_id"))
+# exclude loops (self edges)
+nonedges_endstate <- with(nonedges_endstate, nonedges_endstate[sender_final_id != receiver_final_id,])
 # complete rest of table
 nonedges_endstate <- merge(nonedges_endstate, participants[, c("final_id","role")], by.x=c("sender_final_id"), by.y=c("final_id"))
 nonedges_endstate <- merge(nonedges_endstate, participants[, c("final_id","role")], by.x=c("receiver_final_id"), by.y=c("final_id"))
