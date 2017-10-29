@@ -1,3 +1,4 @@
+library(R6)
 library(ggplot2)
 library(RColorBrewer)
 library(igraph)
