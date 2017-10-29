@@ -192,8 +192,8 @@ nonedges_endstate <- anti_join(nonedges_endstate, edges_endstate, by=c("pair_id"
 # exclude loops (self edges)
 nonedges_endstate <- with(nonedges_endstate, nonedges_endstate[sender_final_id != receiver_final_id,])
 # complete rest of table
-nonedges_endstate <- merge(nonedges_endstate, participants[, c("final_id","role")], by.x=c("sender_final_id"), by.y=c("final_id"))
-nonedges_endstate <- merge(nonedges_endstate, participants[, c("final_id","role")], by.x=c("receiver_final_id"), by.y=c("final_id"))
+nonedges_endstate <- merge(nonedges_endstate, participants[, c("final_id","role","semester","night")], by.x=c("sender_final_id","semester","night"), by.y=c("final_id","semester","night"))
+nonedges_endstate <- merge(nonedges_endstate, participants[, c("final_id","role","semester","night")], by.x=c("receiver_final_id","semester","night"), by.y=c("final_id","semester","night"))
 colnames(nonedges_endstate)[colnames(nonedges_endstate)=="role.x"] <- c("sender_role")
 colnames(nonedges_endstate)[colnames(nonedges_endstate)=="role.y"] <- c("receiver_role")
 nonedges_endstate$dyad <- substr(nonedges_endstate$sender_final_id, 2, 999) == substr(nonedges_endstate$receiver_final_id, 2, 999)
