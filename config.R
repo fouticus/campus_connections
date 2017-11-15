@@ -1,4 +1,5 @@
 library(R6)
+library(rstackdeque)
 library(ggplot2)
 library(RColorBrewer)
 library(igraph)
