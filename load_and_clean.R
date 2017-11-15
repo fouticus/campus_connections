@@ -152,15 +152,15 @@ edges_45 <- valid_edges[valid_edges$survnum==4 | valid_edges$survnum==5,]
 
 ##### We changed our minds, no longer are we excluding people who send no relationships, now just exclude if they are not present on both weeks
 # count how many times each relationship is mentioned (max 2 if mentioned in both surveys) (put answer in sn1)
-count_45 <- aggregate(sn1~receiver_final_id+night+sender_final_id+semester, edges_45, length)
+#count_45 <- aggregate(sn1~receiver_final_id+night+sender_final_id+semester, edges_45, length)
 # count a person as being present on both nights if any outgoing relationship is indicated in both weeks (take max over sn1)
-present_45 <- aggregate(sn1~semester+night+sender_final_id, count_45, max) 
+#present_45 <- aggregate(sn1~semester+night+sender_final_id, count_45, max) 
 # include a person if they were present on both nights (sn1 should be 2 for these senders)
-present_45 <- present_45[which(present_45$sn1==2),1:dim(present_45)[2]-1]  # omit sn1 column
+#present_45 <- present_45[which(present_45$sn1==2),1:dim(present_45)[2]-1]  # omit sn1 column
 ##### New way of doing this, include people if they were present on both nights
-#present_45 <- aggregate(sn1~semester+night+sender_final_id+survnum, edges_45, sum)[,1:4]
-#present_45 <- aggregate(survnum~semester+night+sender_final_id, present_45, sum)
-#present_45 <- present_45[present_45$survnum==9,][1:3]
+present_45 <- aggregate(sn1~semester+night+sender_final_id+survnum, edges_45, sum)[,1:4]
+present_45 <- aggregate(survnum~semester+night+sender_final_id, present_45, sum)
+present_45 <- present_45[present_45$survnum==9,][1:3]
 
 
 # select edges where sender and receiver are in this population. This must be specific to a semester/night, since some mentors serve multiple nights in a semester
