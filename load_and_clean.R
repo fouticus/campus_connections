@@ -171,6 +171,15 @@ edges_endstate <- merge(edges_endstate, relation_present, by.x=c("semester", "ni
 # average last two surveys
 edges_endstate <- aggregate(sn2~receiver_final_id+night+sender_final_id+semester+sn1+sender_missing+receiver_missing+sender_role+receiver_role+pair_id+dyad, edges_endstate, mean)
 
+# summarize the people that are excluded from the end state networks:
+senders <- as.data.frame(unique(edges_endstate$sender_final_id))
+receivers <- as.data.frame(unique(edges_endstate$receiver_final_id))
+colnames(senders) <- colnames(receivers) <- c("final_id")
+present_endstate <- join(senders, receivers, type="full")
+participants_not_in_endstate_network <- anti_join(participants, present_endstate)
+write.csv(participants_not_in_endstate_network, file=paste(output_dir, "participants_not_in_end_state_network.csv", sep=""))
+
+
 ## build list of non-edges
 # create all pairs
 nonedges_endstate <- data.frame(sender_final_id=character(0), receiver_final_id=character(0))
@@ -269,6 +278,10 @@ rm(count_45)
 rm(present_45)
 rm(relation_present)
 rm(p45_sem_night)
+rm(senders)
+rm(receivers)
+rm(present_endstate)
+rm(participants_not_in_endstate_network)
 
 # add gender information to end_state edge lists
 edges_endstate <- add_gender(edges_endstate)
