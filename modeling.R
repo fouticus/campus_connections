@@ -170,7 +170,20 @@ X1$edge <- 1
 X0$edge <- 0
 
 X <- rbind(X0, X1)
-#X <- X[complete.cases(X),]
+
+
+# Naive SBM with 2 blocks
+todo <- c("summary", "conf", "R2", "obs", "pred")
+al <- 0.01
+jitter <- 0.05
+pred_cases_sbm <- data.frame(rbind(c(0, 0),
+                              c(0, 1),
+                              c(1, 0),
+                              c(1, 1)))
+f_sbm <- formula("edge ~ I_sender_mentee * I_receiver_mentee")
+m_sbm <- logistic_model(X, f_sbm, pred_cases_sbm, do=todo, sp=1, jit=jitter, alpha=al)
+write_model_results(m_sbm, "LR_results_2block_SBM")
+
 
 # Model each relation type separately:
 Xe2r <- X[X$I_sender_gender_defined * X$I_receiver_gender_defined == 1 & X$I_sender_ment == 1 & X$I_receiver_ment == 1 & X$I_mentee2mentor,]
