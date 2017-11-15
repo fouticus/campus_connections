@@ -254,3 +254,65 @@ strength_histo <- function(edges, semester_a, night_a, scale_factor){
   print(p)
   dev.off()
 }
+
+betweenness_centrality <- function(adj){
+  # algorithm implemented from:
+  # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.11.2024&rep=rep1&type=pdf
+  # create neighbor lists
+  nbors <- alply(split(adj, seq(NROW(adj))), 1, function(x){which(x!=0)})
+  n <- dim(adj)[1]
+  CB <- vector(length=n)
+  for(v in 1:n){
+    CB[v] <- 0
+  }
+  for(s in 1:n){
+    S <- rstack()
+    Pi <- rep(1, n)
+    P <- list()
+    for(t in 1:n){
+      P[[t]] <- list()
+    }
+    sigm <- rep(0, n)
+    sigm[s] <- 1
+    d <- rep(-1, n)
+    d[s] <- 0
+    #Q <- rpqueue()
+    Q <- rdeque()
+    Q <- insert_back(Q, s)
+    while(!rstackdeque::empty(Q)){
+      v <- peek_front(Q)
+      Q <- without_front(Q)
+      S <- insert_top(S, v)
+      for(w in nbors[[v]]){
+        if(d[w] < 0){
+          Q <- insert_back(Q, w)
+          d[w] <- d[v] + 1
+        }
+        if(d[w] == d[v] + 1){
+          sigm[w] <- sigm[w] + sigm[v]
+          P[[w]][[Pi[w]]] <- v
+          Pi[w] = Pi[w] + 1
+        }
+      }
+    }
+    delt <- rep(0 ,n)
+    while(!rstackdeque::empty(S)){
+      w <- peek_top(S)
+      S <- without_top(S)
+      for(v in P[[w]]){
+        delt[v] <- delt[v] + sigm[v]/sigm[w] * (1+delt[w])
+      }
+      if(w != s){
+        CB[w] <- CB[w] + delt[w]
+      }
+    }
+  }
+  return(CB)
+}
+
+adj <- matrix(c(0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0), nrow=4)
+adj <- matrix(c(0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0), nrow=5)
+c <- r <- 10
+adj <- round(matrix(runif(r*c), r, c))
+
+print(betweenness_centrality(adj))
