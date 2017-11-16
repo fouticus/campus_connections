@@ -3,8 +3,8 @@ source("config.R")
 
 ### Logistic regression:
 # create data matrix for use in logistic regression
-X1 <- edges_endstate[, c("semester", "night", "mfam_night", "sender_role", "receiver_role", "dyad", "sender_gender", "receiver_gender", "sender_fam_id", "receiver_fam_id")]
-X0 <- nonedges_endstate[, c("semester", "night", "mfam_night", "sender_role", "receiver_role", "dyad", "sender_gender", "receiver_gender", "sender_fam_id", "receiver_fam_id")]
+X1 <- edges_endstate[, c("semester", "night", "mfam_night", "sender_role", "receiver_role", "dyad", "sender_gender", "receiver_gender", "sender_fam_id", "receiver_fam_id", "sender_final_id", "receiver_final_id")]
+X0 <- nonedges_endstate[, c("semester", "night", "mfam_night", "sender_role", "receiver_role", "dyad", "sender_gender", "receiver_gender", "sender_fam_id", "receiver_fam_id", "sender_final_id", "receiver_final_id")]
 
 # add indicator variables
 create_indicators <- function(X){
@@ -172,17 +172,32 @@ X0$edge <- 0
 X <- rbind(X0, X1)
 
 
+X_sbm <- X[X$I_sender_gender_defined * X$I_receiver_gender_defined == 1 & X$I_sender_ment == 1 & X$I_receiver_ment == 1,]
 # Naive SBM with 2 blocks
 todo <- c("summary", "conf", "R2", "obs", "pred")
 al <- 0.01
 jitter <- 0.05
 pred_cases_sbm <- data.frame(rbind(c(0, 0),
-                              c(0, 1),
-                              c(1, 0),
-                              c(1, 1)))
+                                   c(0, 1),
+                                   c(1, 0),
+                                   c(1, 1)))
 f_sbm <- formula("edge ~ I_sender_mentee * I_receiver_mentee")
-m_sbm <- logistic_model(X, f_sbm, pred_cases_sbm, do=todo, sp=1, jit=jitter, alpha=al)
+m_sbm <- logistic_model(X_sbm, f_sbm, pred_cases_sbm, do=todo, sp=1, jit=jitter, alpha=al)
 write_model_results(m_sbm, "LR_results_2block_SBM")
+
+
+# SBM with 2 blocks and condition factor
+pred_cases_sbm2 <- data.frame(rbind(c(0, 0, 0),
+                                    c(0, 0, 1),
+                                    c(0, 1, 0),
+                                    c(0, 1, 1),
+                                    c(1, 0, 0),
+                                    c(1, 0, 1),
+                                    c(1, 1, 0),
+                                    c(1, 1, 1)))
+f_sbm2 <- formula("edge ~ I_mfam_night * I_sender_mentee * I_receiver_mentee")
+m_sbm2 <- logistic_model(X_sbm, f_sbm2, pred_cases_sbm2, do=todo, sp=1, jit=jitter, alpha=al)
+write_model_results(m_sbm2, "LR_results_2block_SBM_w_condition")
 
 
 # Model each relation type separately:
@@ -196,28 +211,27 @@ todo <- c("summary", "conf", "R2", "obs", "pred")
 al <- 0.01
 jitter <- 0.05
 pred_cases <- data.frame(rbind(c(0, 0, 0, 0),
-                               c(0, 1, 0, 0),
                                c(0, 0, 0, 1),
-                               c(1, 0, 0, 0),
-                               c(1, 1, 0, 0),
-                               c(1, 0, 0, 1),
                                c(0, 0, 1, 0),
-                               c(0, 1, 1, 0),
                                c(0, 0, 1, 1),
+                               c(0, 1, 0, 0),
+                               c(0, 1, 0, 1),
+                               c(1, 0, 0, 0),
+                               c(1, 0, 0, 1),
                                c(1, 0, 1, 0),
-                               c(1, 1, 1, 0),
-                               c(1, 0, 1, 1)))
+                               c(1, 0, 1, 1),
+                               c(1, 1, 0, 0),
+                               c(1, 1, 0, 1)))
 pred_cases2 <- data.frame(rbind(c(0, 0, 0),
-                               c(1, 0, 0),
-                               c(0, 1, 0),
-                               c(0, 0, 1),
-                               c(0, 1, 1),
-                               c(1, 0, 0),
-                               c(1, 1, 0),
-                               c(1, 0, 1),
-                               c(1, 1, 1)))
-f1 <- formula("edge ~ I_same_gender + I_same_dyad * I_mfam_night + I_same_mfam_diff_dyad * I_mfam_night")
-f2 <- formula("edge ~ I_same_gender + I_same_mfam_diff_dyad * I_mfam_night")
+                                c(0, 0, 1),
+                                c(0, 1, 0),
+                                c(0, 1, 1),
+                                c(1, 0, 0),
+                                c(1, 0, 1),
+                                c(1, 1, 0),
+                                c(1, 1, 1)))
+f1 <- formula("edge ~ I_mfam_night * I_same_dyad + I_mfam_night * I_same_mfam_diff_dyad + I_same_gender")
+f2 <- formula("edge ~ I_mfam_night * I_same_mfam_diff_dyad + I_same_gender")
 m_e2r <- logistic_model(Xe2r, f1, pred_cases, do=todo, sp=1, jit=jitter, alpha=al)
 m_r2e <- logistic_model(Xr2e, f1, pred_cases, do=todo, sp=1, jit=jitter, alpha=al)
 m_e2e <- logistic_model(Xe2e, f2, pred_cases2, do=todo, sp=1, jit=jitter, alpha=al)
@@ -227,6 +241,8 @@ write_model_results(m_r2e, "LR_results_Mentor2Mentee")
 write_model_results(m_e2e, "LR_results_Mentee2Mentee")
 write_model_results(m_r2r, "LR_results_Mentor2Mentor")
 
+
+# do this per night
 todo <- c("summary", "conf", "obs")
 for(sem in c("Fa15", "Sp16", "Fa16", "Sp17")){
   for(nigt in c("Mon", "Tue", "Wed", "Thu")){
