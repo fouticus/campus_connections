@@ -22,11 +22,14 @@ data_dir <- "../data/"
 
 
 ### Which semesters we are looking at right now.
-#semesters <- c("Fa15", "Sp16", "Fa16", "Sp17")
-semesters <- c("Sp17")
+semesters <- c("Fa15", "Sp16", "Fa16", "Sp17")
+#semesters <- c("Sp17")
 #semesters <- c("Fa15", "Sp16", "Fa16")
 #semesters = c("Fa16", "Fa15")
 #semesters = c("Fa16")
+
+### And which nights
+nights <- c("Mon", "Tue", "Wed", "Thu")
 
 
 ### Plot settings
