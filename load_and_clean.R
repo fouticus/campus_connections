@@ -282,7 +282,6 @@ add_gender <- function(df){
 ### remove_things that pollute the environment
 rm(edges_45)
 #rm(count_45)
-rm(present_45)
 rm(relation_present)
 rm(p45_sem_night)
 rm(senders)
