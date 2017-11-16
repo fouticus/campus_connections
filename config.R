@@ -13,6 +13,8 @@ library(grid)
 library(gridExtra)
 library(viridisLite)
 library(openxlsx)
+library(hashmap)
+library(parallel)
 
 ### Directories
 output_dir <- "../output/"
