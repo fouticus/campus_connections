@@ -386,3 +386,13 @@ mclapply2 <- function(X, FUN, ...,
   })
   result
 }
+
+get_factors <- function(x) {
+  if(x==1){
+    return(numeric(0))
+  }
+  x <- as.integer(x)
+  div <- 1+seq_len(abs(x)-2)
+  factors <- div[x %% div == 0L]
+  return(factors)
+}
