@@ -63,46 +63,67 @@ GDI <- R6Class(
 ##### some functions #####
 # compute different statistics about a model
 network_stats <- function(adj, groups=NULL){
+  n <- dim(adj)[1]
   n_stats <- new.env()
-  n_stats$out_degrees <- rowSums(adj)
-  n_stats$in_degrees <- colSums(adj)
-  n_stats$ave_out_degree <- mean(n_stats$out_degrees)
-  n_stats$ave_in_degree <- mean(n_stats$in_degrees)
+  n_stats$out_degree <- t(as.array(rowSums(adj), dim=c(1, n)))
+  n_stats$in_degree <- t(as.array(colSums(adj), dim=c(1, n)))
+  n_stats$out_degree_ave <- mean(n_stats$out_degree)
+  n_stats$in_degree_ave <- mean(n_stats$in_degree)
+  n_stats$out_degree_stddev <- sqrt(var(t(n_stats$out_degree)))
+  n_stats$in_degree_stddev <- sqrt(var(t(n_stats$in_degree)))
   if(!is.null(groups)){
-    group_ave_out_degree <- vector(length=length(groups))
-    group_ave_in_degree <- vector(length=length(groups))
+    n_grps <- length(groups)
+    group_out_degree <- list(length=n_grps)
+    group_in_degree <- list(length=n_grps)
+    group_out_degree_ave <- array(dim=c(1, n_grps))
+    group_in_degree_ave <- array(dim=c(1, n_grps))
+    group_out_degree_stddev <- array(dim=c(1, n_grps))
+    group_in_degree_stddev <- array(dim=c(1, n_grps))
     idx <- 1
     for(i in 1:length(groups)){
       n_g <- groups[i]
       if(n_g==1){
-        group_ave_out_degree[i] <- sum(adj[idx:(idx+n_g-1),])
-        group_ave_in_degree[i] <- sum(adj[,idx:(idx+n_g-1)])
+        group_out_degree[[i]] <- as.array(t(sum(adj[idx:(idx+n_g-1),])))
+        group_in_degree[[i]] <- as.array(t(sum(adj[,idx:(idx+n_g-1)])))
+        group_out_degree_stddev[i] <- 0
+        group_in_degree_stddev[i] <- 0
       } else {
-        group_ave_out_degree[i] <- mean(rowSums(adj[idx:(idx+n_g-1),]))
-        group_ave_in_degree[i] <- mean(colSums(adj[,idx:(idx+n_g-1)]))
+        group_out_degree[[i]] <- as.array(t(rowSums(adj[idx:(idx+n_g-1),])))
+        group_in_degree[[i]] <- as.array(t(colSums(adj[,idx:(idx+n_g-1)])))
+        group_out_degree_stddev[i] <- sqrt(var(t(group_out_degree[[i]])))
+        group_in_degree_stddev[i] <- sqrt(var(t(group_out_degree[[i]])))
       }
+      group_out_degree_ave[i] <- mean(group_out_degree[[i]])
+      group_in_degree_ave[i] <- mean(group_in_degree[[i]])
       idx <- idx + n_g
     }
-    n_stats$group_ave_out_degree <- group_ave_out_degree
-    n_stats$group_ave_in_degree <- group_ave_in_degree
+    n_stats$group_out_degree <- group_out_degree
+    n_stats$group_in_degree <- group_in_degree
+    n_stats$group_out_degree_ave <- group_out_degree_ave
+    n_stats$group_in_degree_ave <- group_in_degree_ave
+    n_stats$group_out_degree_stddev <- group_out_degree_stddev
+    n_stats$group_in_degree_stddev <- group_in_degree_stddev
   }
-  n_stats$CB <- betweenness_centrality(adj)
-  n_stats$ave_CB <- mean(n_stats$CB)
+  n_stats$CB <- t(as.array(betweenness_centrality(adj)))
+  n_stats$CB_ave <- mean(t(n_stats$CB))
+  n_stats$CB_stddev <- sqrt(var(t(n_stats$CB)))
+  n_stats$cycles <- list()
+  n_stats$cycles_ave <- list()
+  n_stats$cycles_stddev <- list()
+  A <- adj
+  for(i in 1:3){
+    A <- A %*% adj
+    n_stats$cycles[[i]] <- t(as.array(diag(A)))
+    n_stats$cycles_ave[[i]] <- sum(n_stats$cycles[[i]])
+    n_stats$cycles_stddev[[i]] <- sqrt(var(t(n_stats$cycles[[i]])))
+  }
   return(n_stats)
 }
 
 # run a simulation of models
 mc_sim <- function(net_model, N, par=FALSE, cores=3){
   run_sim <- function(i, net_m){
-    # make a realization of this graph model
-    n_stats <- network_stats(net_m$realize(), net_m$groups)
-    env <- new.env()
-    env$ave_out_degs <- n_stats$ave_out_degree
-    env$ave_in_degs <- n_stats$ave_in_degree
-    env$group_ave_out_degs <- n_stats$group_ave_out_degree
-    env$group_ave_in_degs <- n_stats$group_ave_in_degree
-    env$ave_CB <- n_stats$ave_CB
-    return(env)
+    return(network_stats(net_m$realize(), net_m$groups))
   }
   if(par){
     envs <- mclapply(1:N, run_sim, net_model, mc.cores=cores)
@@ -111,22 +132,70 @@ mc_sim <- function(net_model, N, par=FALSE, cores=3){
     envs <- lapply(1:N, run_sim, net_model)
   }
   # combine all results
+  retenv <- combine_envs(envs)
+  return(retenv)
+}
+
+combine_envs <- function(envs, along=1, ignore=c()){
+  var_names <- names(envs[[1]])
   retenv <- new.env()
-  retenv$ave_out_degs <- vector(length=N)
-  retenv$ave_in_degs <- vector(length=N)
-  retenv$group_ave_in_degs <- matrix(ncol=length(net_model$groups), nrow=N)
-  retenv$group_ave_out_degs <- matrix(ncol=length(net_model$groups), nrow=N)
-  retenv$ave_CB <- vector(length=N)
-  for(i in 1:length(envs)){
-    env <- envs[[i]]
-    retenv$ave_out_degs[i] <- env$ave_out_degs
-    retenv$ave_in_degs[i] <- env$ave_in_degs
-    retenv$group_ave_in_degs[i,] <- env$group_ave_in_degs
-    retenv$group_ave_out_degs[i,] <- env$group_ave_out_degs
-    retenv$ave_CB[i] <- env$ave_CB
+  first <- T
+  for(j in 1:length(envs)){
+    for(i in 1:length(var_names)){
+      nam <- var_names[i]
+      if(nam %in% ignore){next}
+      tmp <- get(nam, envs[[j]])
+      if(is.atomic(tmp)){ # Not a list:
+        if(first){
+          assign(nam, tmp, retenv)
+        } else {
+          assign(nam, abind(get(nam, retenv), tmp, along=along), retenv)
+        }
+      } else { # A list:
+        if(first){
+          assign(nam, tmp, retenv)
+        } else {
+          tmp2 <- get(nam, retenv)
+          for(idx in 1:length(tmp2)){
+            tmp2[[idx]] <- abind(tmp2[[idx]], tmp[[idx]], along=along)
+          }
+          assign(nam, tmp2, retenv)
+        }
+      }
+    }
+    first <- F
   }
   return(retenv)
 }
+
+rowVar <- function(x){
+  rowSums((x - rowMeans(x))^2)/(dim(x)[2] - 1)
+}
+
+row_summary <- function(env){
+  var_names <- names(env)
+  retenv <- new.env()
+  first <- T
+  for(i in 1:length(var_names)){
+    nam <- var_names[i]
+    tmp <- get(nam, env)
+    if(is.atomic(tmp)){ # It's not a list
+      assign(paste(nam, "_ave", sep=""), rowMeans(tmp), retenv)
+      assign(paste(nam, "_stddev", sep=""), sqrt(rowVar(tmp)), retenv)
+    } else { # It's a list
+      tmp_ave <- list()
+      tmp_stddev <- list()
+      for(idx in 1:length(tmp)){
+        tmp_ave[[idx]] <- rowMeans(tmp[[idx]])
+        tmp_stddev[[idx]] <- sqrt(rowVar(tmp[[idx]]))
+      }
+      assign(paste(nam, "_ave", sep=""), tmp_ave, retenv)
+      assign(paste(nam, "_stddev", sep=""), tmp_stddev, retenv)
+    }
+  }
+  return(retenv)
+}
+
 
 plot_results <- function(sim_results, true_stats, bins, group_labels=NULL, save=FALSE, fprefix=""){
   plot_hist <- function(dat, vert, xlabel, main=NULL, save=FALSE, fprefix="", fpostfix="hist"){
@@ -149,19 +218,33 @@ plot_results <- function(sim_results, true_stats, bins, group_labels=NULL, save=
     cols <- round(ng/rows)
     par(mfrow=c(cols, rows), oma=c(0, 0, 2, 0))
     for(i in 1:ng){
-      plot_hist(dats[,i], verts[i], xlabel, mains[i], save=FALSE, fprefix=fprefix)
+      if(is.atomic(dats)){
+        plot_hist(dats[,i], verts[i], xlabel, mains[i], save=FALSE, fprefix=fprefix)
+      } else {
+        plot_hist(dats[[i]], verts[[i]], xlabel, mains[i], save=FALSE, fprefix=fprefix)
+      }
     }
     title(main, outer=TRUE)
     par(mfrow=c(1,1), oma=c(0,0,0,0))
     if(save){dev.off()}
   }
-  # plot in and out degrees
-  plot_hist(sim_results$ave_in_degs, true_stats$ave_in_degree, "", "Average In Degree", save, fprefix, "ave_in_deg")
-  plot_hist(sim_results$ave_out_degs, true_stats$ave_out_degree, "", "Average Out Degree", save, fprefix, "ave_out_deg")
-  panel_hist(sim_results$group_ave_in_degs, true_stats$group_ave_in_degree, "", group_labels, "Average In Degree", save, fprefix, "group_ave_in_deg")
-  panel_hist(sim_results$group_ave_out_degs, true_stats$group_ave_out_degree, "", group_labels, "Average Out Degree", save, fprefix, "group_ave_out_deg")
+  # plot ave in and out degrees
+  plot_hist(sim_results$in_degree_ave, true_stats$in_degree_ave, "", "Average In Degree", save, fprefix, "in_deg_ave")
+  plot_hist(sim_results$out_degree_ave, true_stats$out_degree_ave, "", "Average Out Degree", save, fprefix, "out_deg_ave")
+  panel_hist(sim_results$group_in_degree_ave, true_stats$group_in_degree_ave, "", group_labels, "Average In Degree", save, fprefix, "group_in_deg_ave")
+  panel_hist(sim_results$group_out_degree_ave, true_stats$group_out_degree_ave, "", group_labels, "Average Out Degree", save, fprefix, "group_out_deg_ave")
+  # plot stddev in and out degrees
+  plot_hist(sim_results$in_degree_stddev, true_stats$in_degree_stddev, "", "Standard Deviaion In Degree", save, fprefix, "in_deg_stddev")
+  plot_hist(sim_results$out_degree_stddev, true_stats$out_degree_stddev, "", "Standard Deviaion Out Degree", save, fprefix, "out_deg_stddev")
+  panel_hist(sim_results$group_in_degree_stddev, true_stats$group_in_degree_stddev, "", group_labels, "Standard Deviation In Degree", save, fprefix, "group_in_deg_stddev")
+  panel_hist(sim_results$group_out_degree_stddev, true_stats$group_out_degree_stddev, "", group_labels, "Standard Deviaion Out Degree", save, fprefix, "group_out_deg_stddev")
   # plot betweenness centrality
-  plot_hist(sim_results$ave_CB, true_stats$ave_CB, "", "Average Betweenness Centrality", save, fprefix, "ave_bet_cent")
+  plot_hist(sim_results$CB_ave, true_stats$CB_ave, "", "Average Betweenness Centrality", save, fprefix, "ave_bet_cent")
+  # plot cycles
+  cycle_labels <- paste(2:(length(true_stats$cycles_ave)+1), "-cycles Average", sep="")
+  panel_hist(sim_results$cycles_ave, true_stats$cycles_ave, "", cycle_labels, "Cycles", save, fprefix, "cycles_ave")
+  cycle_labels <- paste(2:(length(true_stats$cycles_stddev)+1), "-cycles Standard Deviation", sep="")
+  panel_hist(sim_results$cycles_stddev, true_stats$cycles_stddev, "", cycle_labels, "Cycles", save, fprefix, "cycles_stddev")
 }
 
 ##### end functions #####
@@ -212,7 +295,9 @@ SBM_modeling <- function(night, semester, N, bins, par=FALSE, cores=NULL){
   m_gdi_gen <- GDI$new(groups=groups, probs=p)
   # run simulation
   results <- mc_sim(m_gdi_gen, N, par=par, cores=cores)
-  plot_results(results, network_stats(A, groups), bins, c("Mentors", "Mentees"), save=TRUE, fprefix=sprintf("%s_%s_%s_%d", "SBM", sem, night, N))
+  empirical <- network_stats(A, groups)
+  plot_results(results, empirical, bins, c("Mentors", "Mentees"), save=TRUE, fprefix=sprintf("%s_%d_%s_%s", "SBM", N, sem, night))
+  return(list(results, empirical))
 }
 
 SBM2_modeling <- function(night, semester, N, bins, par=FALSE, cores=NULL){
@@ -248,32 +333,53 @@ SBM2_modeling <- function(night, semester, N, bins, par=FALSE, cores=NULL){
   m_gdi_gen <- GDI$new(groups=groups, probs=p)
   # run simulation
   results <- mc_sim(m_gdi_gen, N, par=par, cores=cores)
-  plot_results(results, network_stats(A, groups), bins, c("Mentors", "Mentees"), save=TRUE, fprefix=sprintf("%s_%s_%s_%d", "SBM2", sem, night, N))
+  empirical <- network_stats(A, groups)
+  plot_results(results, empirical, bins, c("Mentors", "Mentees"), save=TRUE, fprefix=sprintf("%s_%d_%s_%s", "SBM2", N, sem, night))
+  return(list(results, empirical))
 }
+
+# Return to the best location
 
 # Simulate some SBM's based on the SBM LR we ran
-N <- 1000
+N <- 500
 bins=50
 
-#night <- "Mon"
-#sem <- "Fa15"
+k <- 1
+results <- list(length=length(semesters)*length(nights))
+empirical <- list(length=length(semesters)*length(nights))
 for(sem in semesters){
   for(night in nights){
     t_start <- Sys.time()
     cat(sprintf("%s: Semester: %s, Night: %s", t_start, sem, night))
-    SBM_modeling(night, sem, N, bins, par=T, cores=4)
+    modeling_results <- SBM_modeling(night, sem, N, bins, par=T, cores=3)
+    results[[k]] <- modeling_results[[1]]
+    empirical[[k]] <- modeling_results[[2]]
     cat(sprintf(", Duration: %s minutes\n", round(difftime(Sys.time(), t_start, units="min"), 2)))
+    k <- k + 1
   }
 }
+stat_names <- names(results[[1]])
+ignore = c(stat_names[grep("stddev", stat_names)], stat_names[grep("ave", stat_names)])
+global_results <- row_summary(combine_envs(results, along=2, ignore=ignore))
+global_empirical <- row_summary(combine_envs(empirical, along=2, ignore=ignore))
+plot_results(global_results, global_empirical, bins, c("Mentees", "Mentors"), save=T, fprefix=sprintf("%s_%d_%s", "SBM", N, "global"))
 
 
-#night <- "Mon"
-#sem <- "Fa15"
+night <- "Mon"
+sem <- "Fa15"
 for(sem in semesters){
   for(night in nights){
     t_start <- Sys.time()
     cat(sprintf("%s: Semester: %s, Night: %s", t_start, sem, night))
-    SBM2_modeling(night, sem, N, bins, par=T, cores=3)
+    modeling_results <- SBM2_modeling(night, sem, N, bins, par=T, cores=3)
+    results[[k]] <- modeling_results[[1]]
+    empirical[[k]] <- modeling_results[[2]]
     cat(sprintf(", Duration: %s minutes\n", round(difftime(Sys.time(), t_start, units="min"), 2)))
+    k <- k + 1
   }
 }
+stat_names <- names(results[[1]])
+ignore = c(stat_names[grep("stddev", stat_names)], stat_names[grep("ave", stat_names)])
+global_results <- row_summary(combine_envs(results, along=2, ignore=ignore))
+global_empirical <- row_summary(combine_envs(empirical, along=2, ignore=ignore))
+plot_results(global_results, global_empirical, bins, c("Mentees", "Mentors"), save=T, fprefix=sprintf("%s_%d_%s", "SBM2", N, "global"))
