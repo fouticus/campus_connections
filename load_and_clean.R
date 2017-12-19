@@ -257,6 +257,16 @@ add_fam_id <- function(df){
   df[, c("sender_mentor_fam_id", "sender_mentee_fam_id", "receiver_mentor_fam_id", "receiver_mentee_fam_id")] <- list(NULL)
   return(df)
 }
+add_fam_id2 <- function(df){
+  mentee_family_ids <- mentee_master[, c("final_id", "menfamid")]
+  mentor_family_ids <- data.frame("final_id"=sapply(mentee_family_ids[,"final_id"], FUN=function(x) paste("m",substr(x, 2, 100000),sep="")), "menfamid"=mentee_family_ids[,"menfamid"])
+  family_ids <- rbind(mentee_family_ids, mentor_family_ids)
+  #fam_labels <- levels(family_ids$menfamid)
+  #fam_labels <- c(fam_labels[2:length(fam_labels)], "")  # "" (empty string) label is at front of list, but NA's use the last label, so move to end
+  #family_ids$menfamid <- factor(family_ids$menfamid, labels=fam_labels)
+  df <- smart_join(df, family_ids)
+  return(df)
+}
 
 # gender information
 add_gender <- function(df){
@@ -296,6 +306,7 @@ nonedges_endstate <- add_gender(nonedges_endstate)
 # Mentor family information
 edges_endstate <- add_fam_id(edges_endstate)
 nonedges_endstate <- add_fam_id(nonedges_endstate)
+participants <- add_fam_id2(participants)
 
 # conditions
 edges_endstate <- join(edges_endstate, conditions)
