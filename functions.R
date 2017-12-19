@@ -720,3 +720,64 @@ SBM2_modeling <- function(night, semester, N, bins, par=FALSE, cores=NULL){
   plot_results(results, empirical, bins, c("Mentors", "Mentees"), save=TRUE, fprefix=sprintf("%s_%d_%s_%s", "SBM2", N, sem, night))
   return(list(results, empirical))
 }
+
+DI_modeling <- function(night, semester, N, bins, par=FALSE, cores=NULL){
+  # construct probability matrix
+  vertices <- present_45[present_45$semester==sem & present_45$night==night, ]
+  vertices <- merge(participants, vertices, by.x=c("semester", "night", "final_id"), by.y=c("semester", "night", "final_id"))
+  vertices <- vertices[vertices$role == "mentor" | vertices$role == "mentee",]
+  vertices <- vertices[order(vertices$role),]
+  n_verts <- nrow(vertices)
+  p <- matrix(rep(0, n_verts*n_verts), nrow=n_verts)
+  for(i in 1:n_verts){
+    for(j in 1:n_verts){
+      if(i==j){next}
+      sender <- vertices[i,]
+      receiver <- vertices[j,]
+      sender_dyad <- substr(sender$final_id, 2, 999)
+      receiver_dyad <- substr(receiver$final_id, 2, 999)
+      sender_mfam <- sender$menfamid
+      receiver_mfam <- receiver$menfamid
+      if(sender$role == receiver$role){
+        pred_row <- data.frame("I_mfam_night"=conditions[conditions$semester==sem & conditions$night==night, 3], 
+                               "I_same_mfam_diff_dyad"= (sender_dyad!=receiver_dyad & sender_mfam==receiver_mfam)*1,
+                               "I_same_gender"=(sender$gender==receiver$gender)*1)
+      } else {
+        pred_row <- data.frame("I_mfam_night"=conditions[conditions$semester==sem & conditions$night==night, 3], 
+                               "I_same_dyad"= (sender_dyad==receiver_dyad)*1,
+                               "I_same_mfam_diff_dyad"= (sender_dyad!=receiver_dyad & sender_mfam==receiver_mfam)*1,
+                               "I_same_gender"=(sender$gender==receiver$gender)*1)
+      }
+      pred_row[, is.na(pred_row)] <- FALSE
+      if(sender$role=="mentor" & receiver$role=="mentor"){
+        rel_model <- m_r2r
+      } else if(sender$role=="mentor" & receiver$role=="mentee"){
+        rel_model <- m_r2e
+      } else if(sender$role=="mentee" & receiver$role=="mentor"){
+        rel_model <- m_e2r
+      } else if(sender$role=="mentee" & receiver$role=="mentee"){
+        rel_model <- m_e2e
+      }
+      prob <- drop(merge(rel_model$X_pred, pred_row)[, "predicted_prob"])
+      p[i, j] <- prob
+    }
+  }
+  # construct adjacency matrix (can still use X_sbm in this case)
+  vert_map <- hashmap(vertices$final_id, 1:n_verts)
+  edges_ <- X_sbm[X_sbm$semester==sem & X_sbm$night==night & X_sbm$edge==1, ]
+  senders <- edges_$sender_final_id
+  receivers <- edges_$receiver_final_id
+  A <- matrix(rep(0, n_verts*n_verts), nrow=n_verts)
+  for(i in 1:dim(edges)[1]){
+    A[vert_map[[senders[i]]], vert_map[[receivers[i]]]] <- 1
+  }
+  
+  # create model
+  groups <- as.data.frame((vertices %>% count(role)))[,2]
+  m_gdi_gen <- GDI$new(groups=groups, probs=p)
+  # run simulation
+  results <- mc_sim(m_gdi_gen, N, par=par, cores=cores)
+  empirical <- network_stats(A, groups)
+  plot_results(results, empirical, bins, c("Mentors", "Mentees"), save=TRUE, fprefix=sprintf("%s_%d_%s_%s", "DI", N, sem, night))
+  return(list(results, empirical))
+}
