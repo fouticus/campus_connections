@@ -1,4 +1,9 @@
-# load packages
+########################################################################################
+## basic_plots.R
+## performs some initial visualization of participants
+########################################################################################
+
+# run config file
 source("config.R")
 
 
