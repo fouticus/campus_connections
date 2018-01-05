@@ -1,12 +1,15 @@
+########################################################################################
+## modeling.R
+## fits statistical network models to end state network data
+########################################################################################
+
+# run config file
 source("config.R")
 
-
-### Logistic regression:
-# create data matrix for use in logistic regression
-X1 <- edges_endstate[, c("semester", "night", "mfam_night", "sender_role", "receiver_role", "dyad", "sender_gender", "receiver_gender", "sender_fam_id", "receiver_fam_id", "sender_final_id", "receiver_final_id")]
-X0 <- nonedges_endstate[, c("semester", "night", "mfam_night", "sender_role", "receiver_role", "dyad", "sender_gender", "receiver_gender", "sender_fam_id", "receiver_fam_id", "sender_final_id", "receiver_final_id")]
-
-# add indicator variables
+##########################
+#### Helper Functions ####
+##########################
+# add indicator variables to dataframe
 create_indicators <- function(X){
   tmp <- X$sender_role=="mentee"
   X$I_sender_mentee <- 0
@@ -71,13 +74,15 @@ create_indicators <- function(X){
   return(X)
 }
 
+# fit a logistic model and perform whatever actions are specified in "do"
 logistic_model <- function(df, form, pred_cases, do=c("summary", "anova", "conf", "R2", "plot", "roc", "resid"), sp=0.5, jit=1, alpha=0){
-  ret_env <- new.env()
+  ret_env <- new.env()  # This environment will be returned by this function
   vars <- all.vars(form)
-  # construct model object
+  # construct model object and null model
   m <- glm(form, family=binomial(link='logit'), data=df)
   m_null <- glm(edge~1, family=binomial(link='logit'),data=df)
   ret_env$m <- m
+  # perform various operations depending on the array "do"
   if("summary" %in% do){
     ret_env$summary <- summary(m)
     print(ret_env$summary)
@@ -107,6 +112,7 @@ logistic_model <- function(df, form, pred_cases, do=c("summary", "anova", "conf"
   if("plot" %in% do){
     plot(m)
   }
+  # compute residuals and plot them
   if("resid" %in% do){
     par(mfrow=c(2,1))
     scatter.smooth(jitter(predict(m, type="response"),amount=jit), jitter(residuals(m, type="deviance"),amount=jit), span=sp, cex=0.1, col=rgb(0, 0, 0, alpha), main="Estimated Probability vs Deviance")
@@ -114,6 +120,7 @@ logistic_model <- function(df, form, pred_cases, do=c("summary", "anova", "conf"
     par(mfrow=c(1,1))
     #loess(predict(m, type="response") ~ residuals(m))
   }
+  # calculate the observed probability of each variable setting in the model
   if("obs" %in% do){
     sum_form <- formula(paste(vars[1], "~", paste(vars[2:length(vars)], collapse=" + ")))
     X_obs  <- aggregate(sum_form, data=df, FUN=mean)
@@ -126,6 +133,7 @@ logistic_model <- function(df, form, pred_cases, do=c("summary", "anova", "conf"
       print(X_obs)
     }
   }
+  # use the model to predict probabilities for the cases specified in pred_cases
   if("pred" %in% do){
     X_pred <- pred_cases
     colnames(X_pred) <- vars[2:length(vars)]
@@ -135,6 +143,7 @@ logistic_model <- function(df, form, pred_cases, do=c("summary", "anova", "conf"
       print(X_pred)
     }
   }
+  # combine predicted and observed if we calculated both
   if("pred" %in% do & "obs" %in% do){
     X_comb <- join(X_pred, X_obs, type='full')
     X_comb$diff <- X_comb$observed_prob - X_comb$predicted_prob
@@ -143,13 +152,13 @@ logistic_model <- function(df, form, pred_cases, do=c("summary", "anova", "conf"
   }
   return(ret_env)
 }
-
+#  Write results of the model to file. optionally specify which items to save using "items"
 write_model_results <- function(m, fname, items=NA){
   f<-file(paste(output_dir, fname, ".txt", sep=""))
   if(is.na(items)){
     items <- sort(names(m))
   }
-  sink(file=f)
+  sink(file=f)  # Direct output to file
   print(fname)
   for(item in items){
     #write(str(m[[item]]), f)
@@ -159,82 +168,114 @@ write_model_results <- function(m, fname, items=NA){
       print(m[[item]])
     }
   }
-  sink()
+  sink()  # Reset output
   close(f)
 }
+
+###################
+#### Data Prep ####
+###################
+# create data matrix for use in logistic regression
+X1 <- edges_endstate[, c("semester", "night", "mfam_night", "sender_role", "receiver_role", "dyad", "sender_gender", "receiver_gender", "sender_fam_id", "receiver_fam_id", "sender_final_id", "receiver_final_id")]
+X0 <- nonedges_endstate[, c("semester", "night", "mfam_night", "sender_role", "receiver_role", "dyad", "sender_gender", "receiver_gender", "sender_fam_id", "receiver_fam_id", "sender_final_id", "receiver_final_id")]
 
 X1 <- create_indicators(X1)
 X0 <- create_indicators(X0)
 
 X1$edge <- 1
 X0$edge <- 0
-
+# combine edges and non-edges
 X <- rbind(X0, X1)
 
 
-X_sbm <- X[X$I_sender_gender_defined * X$I_receiver_gender_defined == 1 & X$I_sender_ment == 1 & X$I_receiver_ment == 1,]
-# Naive SBM with 2 blocks
+# plot settings
+al <- 0.01  # alpha level (transparency)
+jitter <- 0.05  # staggering of points so we can better estimate quantity/density
 todo <- c("summary", "conf", "R2", "obs", "pred")
-al <- 0.01
-jitter <- 0.05
-pred_cases_sbm <- data.frame(rbind(c(0, 0),
-                                   c(0, 1),
+
+
+################################################
+#### SBM with 2 blocks: mentors and mentees ####
+################################################
+# extract edges between mentors and mentees for which we know the gender
+X_sbm <- X[X$I_sender_gender_defined * X$I_receiver_gender_defined == 1 & X$I_sender_ment == 1 & X$I_receiver_ment == 1,]
+# which cases to generate predictions for using the fit model
+pred_cases_sbm <- data.frame(rbind(c(0, 0),  # Mentor to mentor
+                                   c(0, 1),  # Mentor to mentee, etc.
                                    c(1, 0),
                                    c(1, 1)))
-f_sbm <- formula("edge ~ I_sender_mentee * I_receiver_mentee")
+# train model and write results to file
+f_sbm <- formula("edge ~ I_sender_mentee * I_receiver_mentee")  # 2 block model
+cat("###########################\n#### SBM with 2 blocks ####\n###########################\n")
 m_sbm <- logistic_model(X_sbm, f_sbm, pred_cases_sbm, do=todo, sp=1, jit=jitter, alpha=al)
 write_model_results(m_sbm, "LR_results_2block_SBM")
 
 
-# SBM with 2 blocks and condition factor
-pred_cases_sbm2 <- data.frame(rbind(c(0, 0, 0),
+##################################################################
+#### SBM with 2 blocks: mentors and mentees, and MF Condition ####
+##################################################################
+# which cases to generate predictions for using the fit model
+pred_cases_sbm2 <- data.frame(rbind(c(0, 0, 0),  # Mentor to Mentor in control group
                                     c(0, 0, 1),
                                     c(0, 1, 0),
                                     c(0, 1, 1),
                                     c(1, 0, 0),
-                                    c(1, 0, 1),
+                                    c(1, 0, 1),  # Mentee to mentor in treatment group
                                     c(1, 1, 0),
                                     c(1, 1, 1)))
-f_sbm2 <- formula("edge ~ I_mfam_night * I_sender_mentee * I_receiver_mentee")
+# train model and write results to file
+f_sbm2 <- formula("edge ~ I_mfam_night * I_sender_mentee * I_receiver_mentee")  # All possible interactions
+cat("############################################\n#### SBM with 2 blocks and MF Condition ####\n############################################\n")
 m_sbm2 <- logistic_model(X_sbm, f_sbm2, pred_cases_sbm2, do=todo, sp=1, jit=jitter, alpha=al)
 write_model_results(m_sbm2, "LR_results_2block_SBM_w_condition")
 
 
-# Model each relation type separately:
+########################################################
+########## Model Each relation type separately. ########
+#### Like SBM but taking other factors into account ####
+########################################################
+# set up a different data set for each relation type
+# Mentee to Mentor
 Xe2r <- X[X$I_sender_gender_defined * X$I_receiver_gender_defined == 1 & X$I_sender_ment == 1 & X$I_receiver_ment == 1 & X$I_mentee2mentor,]
+# Mentee to Mentee
 Xe2e <- X[X$I_sender_gender_defined * X$I_receiver_gender_defined == 1 & X$I_sender_ment == 1 & X$I_receiver_ment == 1 & X$I_mentee2mentee,]
+# Mentor to Mentee
 Xr2e <- X[X$I_sender_gender_defined * X$I_receiver_gender_defined == 1 & X$I_sender_ment == 1 & X$I_receiver_ment == 1 & X$I_mentor2mentee,]
+# Mentee to Mentee
 Xr2r <- X[X$I_sender_gender_defined * X$I_receiver_gender_defined == 1 & X$I_sender_ment == 1 & X$I_receiver_ment == 1 & X$I_mentor2mentor,]
-#todo <- c("summary", "conf", "resid", "plot", "R2", "ROC", "obs", "pred")
-todo <- c("summary", "conf", "R2", "obs", "pred")
-#todo <- c("obs", "pred")
-al <- 0.01
-jitter <- 0.05
-pred_cases <- data.frame(rbind(c(0, 0, 0, 0),
+# which cases to generate predictions for using the fit model
+# these cases used for cross-group relationships (mentee->mentor and mentor->mentee)
+pred_cases <- data.frame(rbind(c(0, 0, 0, 0),  # control group, diff dyad, diff family, diff gender
                                c(0, 0, 0, 1),
                                c(0, 0, 1, 0),
                                c(0, 0, 1, 1),
-                               c(0, 1, 0, 0),
+                               c(0, 1, 0, 0), 
                                c(0, 1, 0, 1),
                                c(1, 0, 0, 0),
                                c(1, 0, 0, 1),
-                               c(1, 0, 1, 0),
+                               c(1, 0, 1, 0),  # treatment group, diff dyad, same family, diff gender
                                c(1, 0, 1, 1),
                                c(1, 1, 0, 0),
                                c(1, 1, 0, 1)))
-pred_cases2 <- data.frame(rbind(c(0, 0, 0),
+# these cases used for within-group relationships (mentee->mentee and mentor->mentor)
+pred_cases2 <- data.frame(rbind(c(0, 0, 0),  # control group, diff family, diff gender
                                 c(0, 0, 1),
                                 c(0, 1, 0),
                                 c(0, 1, 1),
                                 c(1, 0, 0),
                                 c(1, 0, 1),
                                 c(1, 1, 0),
-                                c(1, 1, 1)))
+                                c(1, 1, 1)))  # treatment group, same family, same gender
+# train models and write results to file
 f1 <- formula("edge ~ I_mfam_night * I_same_dyad + I_mfam_night * I_same_mfam_diff_dyad + I_same_gender")
 f2 <- formula("edge ~ I_mfam_night * I_same_mfam_diff_dyad + I_same_gender")
+cat("##########################\n#### Mentee to Mentor ####\n##########################\n")
 m_e2r <- logistic_model(Xe2r, f1, pred_cases, do=todo, sp=1, jit=jitter, alpha=al)
+cat("##########################\n#### Mentor to Mentee ####\n##########################\n")
 m_r2e <- logistic_model(Xr2e, f1, pred_cases, do=todo, sp=1, jit=jitter, alpha=al)
+cat("##########################\n#### Mentee to Mentee ####\n##########################\n")
 m_e2e <- logistic_model(Xe2e, f2, pred_cases2, do=todo, sp=1, jit=jitter, alpha=al)
+cat("##########################\n#### Mentor to Mentor ####\n##########################\n")
 m_r2r <- logistic_model(Xr2r, f2, pred_cases2, do=todo, sp=1, jit=jitter, alpha=al)
 write_model_results(m_e2r, "LR_results_Mentee2Mentor")
 write_model_results(m_r2e, "LR_results_Mentor2Mentee")
@@ -242,34 +283,36 @@ write_model_results(m_e2e, "LR_results_Mentee2Mentee")
 write_model_results(m_r2r, "LR_results_Mentor2Mentor")
 
 
-# do this per night
-todo <- c("summary", "conf", "obs")
-for(sem in c("Fa15", "Sp16", "Fa16", "Sp17")){
-  for(nigt in c("Mon", "Tue", "Wed", "Thu")){
-    print(paste("####  Semester:", sem, "  Night:", nigt, " ####"))
-    Xsn <- X[X$semester == sem & X$night == nigt & X$I_sender_gender_defined * X$I_receiver_gender_defined == 1 &  X$I_sender_ment ==1 & X$I_receiver_ment == 1,]
-    Xe2r <- Xsn[Xsn$I_mentee2mentor,]
-    Xe2e <- Xsn[Xsn$I_mentee2mentee,]
-    Xr2e <- Xsn[Xsn$I_mentor2mentee,]
-    Xr2r <- Xsn[Xsn$I_mentor2mentor,]
-    f4 <- formula("edge ~ I_same_gender + I_same_mfam_diff_dyad + I_same_dyad")
-    m_e2r <- logistic_model(Xe2r, f4, do=todo, sp=1, jit=jitter, alpha=al)
-    m_r2e <- logistic_model(Xr2e, f4, do=todo, sp=1, jit=jitter, alpha=al)
-    f5 <- formula("edge ~ I_same_gender + I_same_mfam_diff_dyad")
-    m_e2e <- logistic_model(Xe2e, f5, do=todo, sp=1, jit=jitter, alpha=al)
-    m_r2r <- logistic_model(Xr2r, f5, do=todo, sp=1, jit=jitter, alpha=al)
-    readline(prompt="Press [enter] to continue")
-  }
-}
+## do this per night just for kicks (doesn't give great results)
+#todo <- c("summary", "conf", "obs")
+#for(sem in c("Fa15", "Sp16", "Fa16", "Sp17")){
+#  for(nigt in c("Mon", "Tue", "Wed", "Thu")){
+#    print(paste("####  Semester:", sem, "  Night:", nigt, " ####"))
+#    Xsn <- X[X$semester == sem & X$night == nigt & X$I_sender_gender_defined * X$I_receiver_gender_defined == 1 &  X$I_sender_ment ==1 & X$I_receiver_ment == 1,]
+#    Xe2r <- Xsn[Xsn$I_mentee2mentor,]
+#    Xe2e <- Xsn[Xsn$I_mentee2mentee,]
+#    Xr2e <- Xsn[Xsn$I_mentor2mentee,]
+#    Xr2r <- Xsn[Xsn$I_mentor2mentor,]
+#    f4 <- formula("edge ~ I_same_gender + I_same_mfam_diff_dyad + I_same_dyad")
+#    m_e2r <- logistic_model(Xe2r, f4, do=todo, sp=1, jit=jitter, alpha=al)
+#    m_r2e <- logistic_model(Xr2e, f4, do=todo, sp=1, jit=jitter, alpha=al)
+#    f5 <- formula("edge ~ I_same_gender + I_same_mfam_diff_dyad")
+#    m_e2e <- logistic_model(Xe2e, f5, do=todo, sp=1, jit=jitter, alpha=al)
+#    m_r2r <- logistic_model(Xr2r, f5, do=todo, sp=1, jit=jitter, alpha=al)
+#  }
+#}
 
     
     
-#####################  Per Night  ################################
-    
-pred_cases3 <- data.frame(rbind(c(0, 0, 0, 0, 0, 0),
+###############################################################
+###################### Model Per Night ########################
+####### Blocks are (mentor, male mentee, female mentee) #######
+#### Other factors are same/diff dyad and same/diff family ####
+###############################################################
+pred_cases3 <- data.frame(rbind(c(0, 0, 0, 0, 0, 0),  # sender mentor, receiver mentor, diff dyad, diff family
                                 c(0, 0, 0, 0, 0, 1),
-                                c(1, 0, 0, 0, 0, 0),
-                                c(1, 0, 0, 0, 0, 1),
+                                c(1, 0, 0, 0, 0, 0),  
+                                c(1, 0, 0, 0, 0, 1),  # sender male mentee, receiver mentor, diff dyad, same family
                                 c(1, 0, 0, 0, 1, 0),
                                 c(0, 1, 0, 0, 0, 0),
                                 c(0, 1, 0, 0, 0, 1),
@@ -280,22 +323,22 @@ pred_cases3 <- data.frame(rbind(c(0, 0, 0, 0, 0, 0),
                                 c(1, 0, 1, 0, 0, 0),
                                 c(1, 0, 1, 0, 0, 1),
                                 c(0, 1, 1, 0, 0, 0),
-                                c(0, 1, 1, 0, 0, 1),
+                                c(0, 1, 1, 0, 0, 1),  # sender mentee female, receiver mentee female, diff dyad, same family
                                 c(0, 0, 0, 1, 0, 0),
-                                c(0, 0, 0, 1, 0, 1),
+                                c(0, 0, 0, 1, 0, 1),  
                                 c(0, 0, 0, 1, 1, 0),
                                 c(1, 0, 0, 1, 0, 0),
                                 c(1, 0, 0, 1, 0, 1),
                                 c(0, 1, 0, 1, 0, 0),
                                 c(0, 1, 0, 1, 0, 1)))
-#todo <- c("summary", "conf", "resid", "R2", "ROC", "obs", "pred")
 todo <- c("summary", "conf", "R2", "obs", "pred")
-#todo <- c("summary", "conf", "resid", "R2", "obs", "pred")
 f3 <- formula("edge ~ I_sender_mentee_male + I_sender_mentee_female + I_receiver_mentee_male + I_receiver_mentee_female + I_sender_mentee_male*I_receiver_mentee_male + I_sender_mentee_female*I_receiver_mentee_male + I_sender_mentee_male*I_receiver_mentee_female + I_sender_mentee_female*I_receiver_mentee_female + I_same_dyad + I_same_mfam_diff_dyad")
-ms <- list()
+ms <- list()  # list of all trained models
+# fit this model on each nights
 for(sem in c("Fa15", "Sp16", "Fa16", "Sp17")){
   for(nigt in c("Mon", "Tue", "Wed", "Thu")){
     # determine if mfam condition or not
+    cat(paste("#######################################\n####  Semester:", sem, "  Night:", nigt, " ####\n#######################################\n"))
     Xsn <- X[X$I_sender_gender_defined * X$I_receiver_gender_defined == 1 & X$I_sender_ment == 1 & X$I_receiver_ment == 1 & X$semester == sem & X$night == nigt,]
     mfam <- if(Xsn$mfam_night[1] == 1) "Yes" else "No"
     print(paste("mfam?", mfam))
@@ -303,24 +346,39 @@ for(sem in c("Fa15", "Sp16", "Fa16", "Sp17")){
     m$mfam <- mfam
     m$name <- paste("LR_results", sem, nigt, sep="_")
     write_model_results(m, m$name)
-    #readline(prompt="Press [enter] to continue")
     ms <- c(ms, m)
   }
 }
+# join the observed and predicted probabilites from each model into a single table and write to file
 master <- NA
 for(m in ms){
   X_comb <- m$X_comb
-  #n_cols <- length(colnames(X_comb))
-  #colnames(X_comb)[[n_cols-3]] <- paste("p_pred", m$name, sep="_")
-  #colnames(X_comb)[[n_cols-2]] <- paste("p_obs", m$name, sep="_")
-  #colnames(X_comb)[[n_cols-1]] <- paste("count", m$name, sep="_")
-  #colnames(X_comb)[[n_cols]] <- paste("diff", m$name, sep="_")
   X_comb$name <- m$name
   if(is.na(master)){
     master <- X_comb
   } else {
-    #master <- join(master, X_comb)
     master <- rbind(master, X_comb)
   }
 }
 write.csv(master, paste(output_dir, "LR_results_by_night_pred_obs.csv", sep=""))
+
+
+#################
+#### Cleanup ####
+#################
+rm(create_indicators)
+rm(logistic_model)
+rm(write_model_results)
+rm(al)
+rm(f_sbm)
+rm(f_sbm2)
+rm(f1)
+rm(f2)
+rm(f3)
+rm(f4)
+rm(f5)
+rm(jitter)
+rm(mfam)
+rm(nigt)
+rm(sem)
+rm(todo)
