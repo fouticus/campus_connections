@@ -136,6 +136,16 @@ for(semester_a in semesters){
     dyad_trajectory(valid_edges, semester_a, night_a, scale_factor, point_size)
   }
 }
+
+#################
+#### Cleanup ####
+#################
 rm(dyad_trajectory)
 rm(plot_outedges_byperson)
 rm(plot_outedges_dyadonly)
+rm(alpha)
+rm(point_size)
+rm(night_a)
+rm(role_a)
+rm(scale_factor)
+rm(semester_a)
