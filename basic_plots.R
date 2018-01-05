@@ -26,3 +26,13 @@ p_mentee_role <- p_mentee_role + role_fill
 p_role <- grid.arrange(p_mentee_role, p_staff_role, ncol=2)
 p_role
 dev.off()
+
+#################
+#### Cleanup ####
+#################
+rm(p_gender)
+rm(p_mentee_gender)
+rm(p_mentee_role)
+rm(p_role)
+rm(p_staff_gender)
+rm(p_staff_role)
