@@ -1,9 +1,22 @@
-# clear workspace
+########################################################################################
+## load_and_clean.R
+## Loads data files and formats them for use in plotting and analysis.
+########################################################################################
+
+
+# clear workspace and garbage collect
 rm(list=ls())
 gc()
 
+# run config file
 source("config.R")
 
+
+#####################
+##### Load Data #####
+#####################
+
+# specify file names
 file_suffix <- "_09.27.17"
 file_suffix2 <- "_10.13.17"
 edgelist_file <- paste("CC_Edgelist", file_suffix2, ".csv", sep="")
@@ -12,17 +25,15 @@ mentee_atr_file <- paste("Mentee_Attributes", file_suffix, ".csv", sep="")
 staff_atr_file <- paste("Staff_Attributes", file_suffix, "_fout.csv", sep="")
 conditions_file <- paste("TX_Assign_fout", ".csv", sep="")
 mentee_master_file <- paste("MASTER", ".csv", sep="")
-#mentor_master_file <- paste("Staff_Master", ".csv", sep="")
+#mentor_master_file <- paste("Staff_Master", ".csv", sep="")  # Not currently used
 mentor_survey_file <- paste("MENTORSURVEY", ".csv", sep="")
 
-# filter out edges to those that are valid
-pyscript2 = paste("python", "../data/valid_edges.py", paste(data_dir, edgelist_file, sep=""), paste(data_dir, valid_edgelist_file, sep=""), sep=" ") 
+# create a new edges file by filtering out edges where sn1 is blank.
+pyscript2 = paste("python", "valid_edges.py", paste(data_dir, edgelist_file, sep=""), paste(data_dir, valid_edgelist_file, sep=""), sep=" ") 
 system(pyscript2)
 
-# convert data to lowercase with python script
-pyscript = "python ../data/tolowercase.py"
-#system(paste(pyscript, paste(data_dir, "CC_Edgelist_foutfixed.csv", sep="")))
-#system(paste(pyscript, paste(data_dir, "CC_Edgelist.csv", sep="")))
+# convert data files to lowercase with python script
+pyscript = "python tolowercase.py"
 system(paste(pyscript, paste(data_dir, edgelist_file, sep="")))
 system(paste(pyscript, paste(data_dir, mentee_atr_file, sep="")))
 system(paste(pyscript, paste(data_dir, staff_atr_file, sep="")))
@@ -36,7 +47,10 @@ edges <- read.csv(paste(data_dir, valid_edgelist_file, sep=""))
 mentees <- read.csv(paste(data_dir, mentee_atr_file, sep=""))
 staff <- read.csv(paste(data_dir, staff_atr_file, sep=""))
 
-# collect those people that were active on second nights
+#############################
+##### Handle Dual Roles #####
+#############################
+# mentors can serve on two nights, here we consolidate night1 and night2 into night, and role1 and role2 into role
 staff2 <- staff[staff$night2!="",]
 colnames(staff2)[4] <- "night"  # rename columns
 colnames(staff2)[7] <- "role"
@@ -47,7 +61,7 @@ colnames(staff)[6] <- "role"
 staff$nightnum <- 1  # create factor for whether this is night1 or night2
 staff <- subset(staff, select=-c(night2, role2))  # remove unused columns
 
-# mentee and room reflect night1 role, so correct if night 2 person is in non-mentor role
+# mentee and room reflect night1 role, so we need to correct if night2 person is in non-mentor role
 fixrole <- function(dataframe){
   rowfun <- function(row, role_col, mentee_col, room_col){
     # if mentor on night 2, then mentee = 1 and room number is not blank
@@ -80,14 +94,17 @@ rm(staff2)
 staff$gender <- as.numeric(as.character(staff$gender))
 
 
-# exclude mentees/edges with no-start equal to 1
+## exclude mentees/edges with no-start equal to 1 (meaning they didn't even start the semester)
 mentees <- mentees[which(is.na(mentees$no_start)),]
 all_ids <- c(as.character(unique(staff$final_id)), as.character(unique(mentees$final_id)))
 edges <- edges[which(with(edges, sender_final_id %in% all_ids & receiver_final_id %in% all_ids)),]
 
 
-# add labels, etc.
-add_labels <- function(df)
+##########################
+##### Format Factors #####
+##########################
+# make certain variables into factors with labels for nicer graphs.
+make_factors <- function(df)
 {
   df$gender = factor(df$gender, levels=c(-1, 0, 1), labels=c("Other", "Female", "Male"))
   df$mfcond= factor(df$mfcond, levels=c(1, 0), labels=c("Mentor Family", "No Mentor Family"))
@@ -97,23 +114,26 @@ add_labels <- function(df)
   return(df)
 }
 
-mentees <- add_labels(mentees)
-staff <- add_labels(staff)
+mentees <- make_factors(mentees)
+staff <- make_factors(staff)
 staff$role = factor(staff$role, levels=c("mentor", "mentor coach", "lead mentor coach", "instructor"), labels=c("mentor", "coach", "lead", "instr"))
  
-# addd labels for edge list
-add_edge_labels <- function(df)
+# make factors for edge list
+make_edge_factors <- function(df)
 {
   df$night = factor(df$night, levels=c("monday", "tuesday", "wednesday", "thursday"), labels=c("Mon", "Tue", "Wed", "Thu"))
   df$semester = factor(df$semester, levels=c("f15", "s16", "f16", "s17", "f17", "s18"), labels=c("Fa15", "Sp16", "Fa16", "Sp17", "Fa17", "Sp18"))
   return(df)
 }
-edges <- add_edge_labels(edges)
+edges <- make_edge_factors(edges)
 
-
+# convert id to a character type
 edges$sender_final_id <- as.character(edges$sender_final_id)
 edges$receiver_final_id <- as.character(edges$receiver_final_id)
 
+########################
+##### Participants #####
+########################
 # join mentees and staff for use in graph
 staff2 <- staff
 staff2$date_dropped <- factor(NA)
@@ -129,10 +149,15 @@ participants$role_num <- as.numeric(role_nums)
 participants <- participants[with(participants, order(role, final_id)),] # order them for consistency in plotting graphs
 participants$final_id <- as.character(participants$final_id)
 
+# from participants df, make staff and mentees 
 staff = subset(participants, participants$role != "mentee")
 mentees = subset(participants, participants$role == "mentee")
 
-# create valid edges dataset
+
+#######################
+##### valid edges #####
+#######################
+# include edges if sender is not missing, sn1 is 1, sn2 is not blank, and receiver is different from sender
 valid_edges <- edges[with(edges, sender_missing==0 & sn1==1 & !is.na(sn2) & sender_final_id!=receiver_final_id), ]
 roles <- participants[,c("final_id", "role", "night")]
 valid_edges <- merge(valid_edges, roles, by.x=c("sender_final_id", "night"), by.y=c("final_id", "night"))
@@ -146,17 +171,21 @@ valid_edges$sender_role=factor(valid_edges$sender_role, levels=role_labels)
 valid_edges$receiver_role=factor(valid_edges$receiver_role, levels=role_labels)
 
 
-### Create end-state network edge list
+#############################
+##### end state network #####
+#############################
 # select only edges from the last two surveys
 edges_45 <- valid_edges[valid_edges$survnum==4 | valid_edges$survnum==5,]
 
 ##### We changed our minds, no longer are we excluding people who send no relationships, now just exclude if they are not present on both weeks
-# count how many times each relationship is mentioned (max 2 if mentioned in both surveys) (put answer in sn1)
+## <--- begin old code --->
+## count how many times each relationship is mentioned (max 2 if mentioned in both surveys) (put answer in sn1)
 #count_45 <- aggregate(sn1~receiver_final_id+night+sender_final_id+semester, edges_45, length)
-# count a person as being present on both nights if any outgoing relationship is indicated in both weeks (take max over sn1)
+## count a person as being present on both nights if any outgoing relationship is indicated in both weeks (take max over sn1)
 #present_45 <- aggregate(sn1~semester+night+sender_final_id, count_45, max) 
-# include a person if they were present on both nights (sn1 should be 2 for these senders)
+## include a person if they were present on both nights (sn1 should be 2 for these senders)
 #present_45 <- present_45[which(present_45$sn1==2),1:dim(present_45)[2]-1]  # omit sn1 column
+## <--- end old code --->
 ##### New way of doing this, include people if they were present on both nights
 present_45 <- aggregate(sn1~semester+night+sender_final_id+survnum, edges_45, sum)[,1:4]
 present_45 <- aggregate(survnum~semester+night+sender_final_id, present_45, sum)
@@ -179,8 +208,8 @@ edges_endstate <- merge(edges_endstate, relation_present, by.x=c("semester", "ni
 edges_endstate <- aggregate(sn2~receiver_final_id+night+sender_final_id+semester+sn1+sender_missing+receiver_missing+sender_role+receiver_role+pair_id+dyad, edges_endstate, mean)
 
 # summarize the people that are excluded from the end state networks:
-senders <- as.data.frame(unique(edges_endstate$sender_final_id))
-receivers <- as.data.frame(unique(edges_endstate$receiver_final_id))
+senders <- as.data.frame(unique(edges_endstate$sender_final_id), stringsAsFactors=FALSE)
+receivers <- as.data.frame(unique(edges_endstate$receiver_final_id), stringsAsFactors=FALSE)
 colnames(senders) <- colnames(receivers) <- c("final_id")
 present_endstate <- join(senders, receivers, type="full")
 participants_not_in_endstate_network <- anti_join(participants, present_endstate)
@@ -215,23 +244,46 @@ colnames(nonedges_endstate)[colnames(nonedges_endstate)=="role.y"] <- c("receive
 nonedges_endstate$dyad <- substr(nonedges_endstate$sender_final_id, 2, 999) == substr(nonedges_endstate$receiver_final_id, 2, 999)
 
 
-### Load some supplemental data
+## add gender information
+add_gender <- function(df){
+  staff_genders <- staff[, c("final_id", "gender")]
+  colnames(staff_genders) <- c("sender_final_id", "sender_gender_mentor")
+  df <- join(df, staff_genders)
+  colnames(staff_genders) <- c("receiver_final_id", "receiver_gender_mentor")
+  df <- join(df, staff_genders)
+  
+  mentee_genders <- mentees[, c("final_id", "gender")]
+  colnames(mentee_genders) <- c("sender_final_id", "sender_gender_mentee")
+  df <- join(df, mentee_genders)
+  colnames(mentee_genders) <- c("receiver_final_id", "receiver_gender_mentee")
+  df <- join(df, mentee_genders)
+  
+  df[, "sender_gender"] <- apply(df[, c("sender_gender_mentor", "sender_gender_mentee")], 1, function(x) x[!is.na(x)])
+  df[, "receiver_gender"] <- apply(df[, c("receiver_gender_mentor", "receiver_gender_mentee")], 1, function(x) x[!is.na(x)])
+  df <- df[, !(names(df) %in% c("sender_gender_mentor", "sender_gender_mentee", "receiver_gender_mentor", "receiver_gender_mentee"))]
+  return(df)
+}
+edges_endstate <- add_gender(edges_endstate)
+nonedges_endstate <- add_gender(nonedges_endstate)
+
+## conditions
 conditions <- read.csv(paste(data_dir, conditions_file, sep=""))
-conditions <- add_edge_labels(conditions)
+conditions <- make_edge_factors(conditions)
 colnames(conditions)[3] <- "mfam_night"
 mentee_master <- read.csv(paste(data_dir, mentee_master_file, sep=""))
-#staff_master <- read.csv(paste(data_dir, mentor_master_file, sep=""))
+#staff_master <- read.csv(paste(data_dir, mentor_master_file, sep=""))  # not currently using
 
-### family id from supplemental data
+# conditions
+edges_endstate <- join(edges_endstate, conditions)
+nonedges_endstate <- join(nonedges_endstate, conditions)
+
+
+## family id
+# smart_join joins in chunks to prevent memory issues
 smart_join <- function(df1, df2, splitsize=1000){
   merged_dfs <- list()
   for(i in 1:ceiling(dim(df1)[1]/splitsize)){
     merged_dfs[[i]] <- join(df1[(splitsize*(i-1)+1):min(dim(df1)[1],(splitsize*i)),], df2)
-    #if(!exists("merged_df")){
-    #  merged_df <- join(df1[1:splitsize,], df2)
-    #} else {
-    #  merged_df <- rbind(merged_df, join(df1[(splitsize*(i-1)+1):min(dim(df1)[1],(splitsize*i)),], df2))
-    #}
   }
   merged_df <- do.call("rbind", merged_dfs)
   return(merged_df)
@@ -261,53 +313,47 @@ add_fam_id2 <- function(df){
   mentee_family_ids <- mentee_master[, c("final_id", "menfamid")]
   mentor_family_ids <- data.frame("final_id"=sapply(mentee_family_ids[,"final_id"], FUN=function(x) paste("m",substr(x, 2, 100000),sep="")), "menfamid"=mentee_family_ids[,"menfamid"])
   family_ids <- rbind(mentee_family_ids, mentor_family_ids)
-  #fam_labels <- levels(family_ids$menfamid)
-  #fam_labels <- c(fam_labels[2:length(fam_labels)], "")  # "" (empty string) label is at front of list, but NA's use the last label, so move to end
-  #family_ids$menfamid <- factor(family_ids$menfamid, labels=fam_labels)
   df <- smart_join(df, family_ids)
   return(df)
 }
 
-# gender information
-add_gender <- function(df){
-  staff_genders <- staff[, c("final_id", "gender")]
-  colnames(staff_genders) <- c("sender_final_id", "sender_gender_mentor")
-  df <- join(df, staff_genders)
-  colnames(staff_genders) <- c("receiver_final_id", "receiver_gender_mentor")
-  df <- join(df, staff_genders)
-  
-  mentee_genders <- mentees[, c("final_id", "gender")]
-  colnames(mentee_genders) <- c("sender_final_id", "sender_gender_mentee")
-  df <- join(df, mentee_genders)
-  colnames(mentee_genders) <- c("receiver_final_id", "receiver_gender_mentee")
-  df <- join(df, mentee_genders)
-  
-  df[, "sender_gender"] <- apply(df[, c("sender_gender_mentor", "sender_gender_mentee")], 1, function(x) x[!is.na(x)])
-  df[, "receiver_gender"] <- apply(df[, c("receiver_gender_mentor", "receiver_gender_mentee")], 1, function(x) x[!is.na(x)])
-  df <- df[, !(names(df) %in% c("sender_gender_mentor", "sender_gender_mentee", "receiver_gender_mentor", "receiver_gender_mentee"))]
-  return(df)
-}
+edges_endstate <- add_fam_id(edges_endstate)
+nonedges_endstate <- add_fam_id(nonedges_endstate)
+participants <- add_fam_id2(participants)
 
 
-### remove_things that pollute the environment
+#############################
+##### cleanup namespace #####
+#############################
 rm(edges_45)
-#rm(count_45)
 rm(relation_present)
 rm(p45_sem_night)
 rm(senders)
 rm(receivers)
 rm(present_endstate)
 rm(participants_not_in_endstate_network)
+rm(all_ids)
+rm(combos)
 
-# add gender information to end_state edge lists
-edges_endstate <- add_gender(edges_endstate)
-nonedges_endstate <- add_gender(nonedges_endstate)
+rm(add_fam_id)
+rm(add_fam_id2)
+rm(add_gender)
+rm(fixrole)
+rm(make_edge_factors)
+rm(make_factors)
+rm(smart_join)
 
-# Mentor family information
-edges_endstate <- add_fam_id(edges_endstate)
-nonedges_endstate <- add_fam_id(nonedges_endstate)
-participants <- add_fam_id2(participants)
+rm(file_suffix)
+rm(file_suffix2)
+rm(pyscript)
+rm(pyscript2)
+rm(conditions_file)
+rm(edgelist_file)
+rm(mentee_atr_file)
+rm(mentee_master_file)
+rm(mentor_survey_file)
+rm(staff_atr_file)
+rm(valid_edgelist_file)
 
-# conditions
-edges_endstate <- join(edges_endstate, conditions)
-nonedges_endstate <- join(nonedges_endstate, conditions)
+rm(sem)
+rm(night)
