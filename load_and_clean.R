@@ -334,6 +334,7 @@ rm(present_endstate)
 rm(participants_not_in_endstate_network)
 rm(all_ids)
 rm(combos)
+rm(role_nums)
 
 rm(add_fam_id)
 rm(add_fam_id2)
