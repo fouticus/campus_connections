@@ -1,12 +1,18 @@
+########################################################################################
+## graph_vis.R
+## visualize networks as circles of nodes with lines in between
+########################################################################################
+
+# run config file
 source("config.R")
-source("functions.R")
+
+# get graph functions (shared with other scripts)
+source("graph_functions.R")
 
 
 scale_factor = 3
 nights <- c("Mon", "Tue", "Wed", "Thu")
-#roles <- c("mentor", "mentee")
 roles <- role_labels
-#nights <- c("Wed", "Thu")
 strengths <- 0:10;
 strengths_labels <- c("[0, 0.5)", "[0.5, 1.5)", "[1.5, 2.5)", "[2.5, 3.5)", "[3.5, 4.5)", "[4.5, 5.5)", "[5.5, 6.5)", "[6.5, 7.5)", "[7.5, 8.5)", "[8.5, 9.5)", "[9.5, 10]")
 survey_nos <- 1:5;
@@ -128,3 +134,30 @@ for(semester in semesters){
     }
   }
 }
+
+
+#################
+#### Cleanup ####
+#################
+rm(add_mtext)
+rm(make_graph)
+rm(plot_graph)
+rm(survey_nos)
+rm(survey_no)
+rm(strengths_labels)
+rm(strengths)
+rm(strength)
+rm(scale_factor)
+rm(semester)
+rm(role)
+rm(om)
+rm(night)
+rm(do_all_survs)
+rm(do_all_survs_roles)
+rm(do_end_state)
+rm(do_end_state_roles)
+rm(do_surv5)
+rm(do_surv5_roles)
+rm(roles)
+rm(net)
+rm(filename)
