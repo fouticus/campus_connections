@@ -1,10 +1,14 @@
 ########################################################################################
 ## graph_stats.R
-## calculate statistics for various types of graphs
+## calculate statistics for various types of graphs and make some plots
 ########################################################################################
 
 # run config file
 source("config.R")
+
+# get graph functions (shared with other scripts)
+source("graph_functions.R")
+
 
 ##########################
 #### Helper Functions ####
@@ -20,66 +24,6 @@ concat_degree <- function(raw_deg, fit_shape){
   } else {
     return(c(raw_deg, numeric(fit_shape - length(raw_deg))))
   }
-}
-# make an igraph object 
-make_graph <- function(participants, edges, semester_a, night_a, strength_a, survey_no_a=NA, sender_role=NA, receiver_role=NA, strength_mode="within", strength_err=0.5){
-  # construct adjacency and vertices
-  verts <- participants[which(with(participants, semester==semester_a & night==night_a)), ]
-  #verts <- participants[with(participants, semester==semester_a), ]
-  #verts <- subset(verts, !duplicated(verts$final_id))
-  #verts <- unique(verts, incomparables=colnames(verts)[2:length(colnames)])
-  
-  adj <- edges[which(with(edges, semester==semester_a & night==night_a & sender_missing==0 & receiver_missing==0 & sn1==1 & !is.na(sn1) & !is.na(sn2))), ]
-  if(!is.na(survey_no_a)){
-    adj <- adj[which(with(adj, survnum==survey_no_a )), ]
-  }
-  # what strength edges to include?
-  if(strength_mode=="atleast"){
-    adj <- adj[with(adj, sn2>=strength_a), ]
-  } else if(strength_mode=="atmost"){
-    adj <- adj[with(adj, sn2<=strength_a), ]
-  } else if(strength_mode=="exact"){
-    adj <- adj[with(adj, sn2==strength_a), ]
-  } else if(strength_mode=="within"){
-    adj <- adj[with(adj, sn2<strength_a + strength_err & sn2 >= strength_a - strength_err), ]
-  } else {
-    stop(paste("Invalid strength_mode:", strength_mode))
-  }
-  # select only specific edges based on role?
-  if(!is.na(sender_role) || !is.na(sender_role)){
-    tmp_df <- subset(verts, select=c("final_id","role"))
-  }
-  if(!is.na(sender_role)){
-    colnames(tmp_df)[1] <- "sender_final_id"
-    tmp_adj <- join(adj, tmp_df)
-    adj <- tmp_adj[tmp_adj$role==sender_role,]
-  }
-  if(!is.na(receiver_role)){
-    colnames(tmp_df)[1] <- "receiver_final_id"
-    tmp_adj <- join(adj, tmp_df)
-    adj <- tmp_adj[tmp_adj$role==receiver_role,]
-  }
-  # reorder columns to work with igraph
-  edge_columns <- c("sender_final_id", "receiver_final_id")
-  other_columns <- colnames(adj)[!colnames(adj) %in% edge_columns]
-  adj <- adj[, c(edge_columns, other_columns)]
-  
-  # check that all necessry vertices exist
-  v_ids <- unique(verts$final_id)
-  es_ids <- unique(adj$sender_final_id)
-  er_ids <- unique(adj$receiver_final_id)
-  if(!all(es_ids %in% v_ids)){
-    print(paste("Sender IDs not in vertices:", toString(subset(es_ids, !(es_ids %in% v_ids)))))
-  }
-  if(!all(er_ids %in% v_ids)){
-    print(paste("Receiver IDs not in vertices:", toString(subset(er_ids, !(er_ids %in% v_ids)))))
-  }
-  
-  
-  # create network
-  net <- graph_from_data_frame(adj, vertices=verts)
-  net <- simplify(net, remove.multiple=TRUE, remove.loops=TRUE)
-  return(net)
 }
 
 role_degree_distribution <- function(net, role_a, ...){
@@ -231,3 +175,34 @@ for(i in 1:length(semesters)){
     strength_histo(valid_edges, semesters[i], nights[j], scale_factor=2)
   }
 }
+
+
+#################
+#### Cleanup ####
+#################
+rm(concat_degree)
+rm(day_ave_degree_plot)
+rm(day_degree_plot)
+rm(graph_stats)
+rm(make_graph)
+rm(role_degree_distribution)
+rm(strength_histo)
+rm(colfunc)
+
+rm(strengths)
+rm(survey_nos)
+rm(i)
+rm(j)
+rm(k)
+rm(l)
+rm(n)
+rm(ma)
+rm(max_deg)
+rm(filename)
+rm(degs)
+rm(net)
+rm(plot_cols)
+rm(plot_rows)
+rm(return_val)
+rm(om)
+rm(colrs)
