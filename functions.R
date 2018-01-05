@@ -93,9 +93,9 @@ day_degree_plot <- function(degs, file_prefix, title_prefix, scale_factor, om, m
 }
 
 plot_graph <- function(net, arrow_size=0.3, vertex_size=10){
-  V(net)$color <- role_pallete[V(net)$role_num]
+  V(net)$color <- role_colors[V(net)$role_num]
   alph=0.5
-  E(net)$color <- unname(sapply(role_pallete[tail_of(net, E(net))$role_num], function(x){x = col2rgb(x, alpha=TRUE); return(rgb(x[1]/255, x[2]/255, x[3]/255, alph))}))
+  E(net)$color <- unname(sapply(role_colors[tail_of(net, E(net))$role_num], function(x){x = col2rgb(x, alpha=TRUE); return(rgb(x[1]/255, x[2]/255, x[3]/255, alph))}))
  
   # plot it 
   lay = layout.circle
