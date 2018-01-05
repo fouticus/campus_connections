@@ -1,3 +1,9 @@
+########################################################################################
+## config.R
+## Loads all necessary R packages, specifies directories, and some plot settings
+########################################################################################
+
+# R Packages
 library(R6)
 library(rstackdeque)
 library(ggplot2)
@@ -22,42 +28,29 @@ output_dir <- "../output/"
 data_dir <- "../data/"
 
 
-### Which semesters we are looking at right now.
+### Which semesters and nights we are looking at right now.
 semesters <- c("Fa15", "Sp16", "Fa16", "Sp17")
-#semesters <- c("Sp17")
-#semesters <- c("Fa15", "Sp16", "Fa16")
-#semesters = c("Fa16", "Fa15")
-#semesters = c("Fa16")
-
-### And which nights
 nights <- c("Mon", "Tue", "Wed", "Thu")
 
 
 ### Plot settings
 theme_set(theme_classic())
-#               mentor, coach, instr, lead, mentee
-role_colors = c("red", "green", "purple", "yellow", "blue")
-role_colors2 = c("red", "blue", "yellow", "purple", "green")
 role_labels = c("mentor", "mentee", "instr", "lead", "coach")
+role_colors = c("red", "green", "purple", "yellow", "blue")
 gender2_colors = c("grey", "pink", "cyan")
 gender3_colors = c("pink", "cyan")
 dyad_colors = c("black", "red")
+role_colors2 = c("red", "blue", "yellow", "purple", "green")
+names(dyad_colors) <- c(FALSE, TRUE)
 
-
-#role_pallete <- brewer.pal(5,"Set1")
-role_pallete <- role_colors
-#names(role_pallete) <- levels(participants$role)
-role_fill <- scale_fill_manual(name = "role", values = role_pallete)
-role_color <- scale_color_manual(name = "role", values = role_pallete)
-sender_role_fill <- scale_fill_manual(name = "sender_role", values = role_pallete)
-sender_role_color <- scale_color_manual(name = "sender_role", values = role_pallete)
-receiver_role_fill <- scale_fill_manual(name = "receiver_role", values = role_pallete)
-receiver_role_color <- scale_color_manual(name = "receiver_role", values = role_pallete)
-
-dyad_pallete <- dyad_colors
-names(dyad_pallete) <- c(FALSE, TRUE)
-dyad_fill <- scale_fill_manual(name = "dyad", values = dyad_pallete)
-dyad_color <- scale_color_manual(name = "dyad", values = dyad_pallete)
-
-
-
+## Set up pallets...
+# For bar graphs, etc.
+role_fill <- scale_fill_manual(name = "role", values = role_colors)
+sender_role_fill <- scale_fill_manual(name = "sender_role", values = role_colors)
+receiver_role_fill <- scale_fill_manual(name = "receiver_role", values = role_colors)
+dyad_fill <- scale_fill_manual(name = "dyad", values = dyad_colors)
+# For line graphs, etc.
+role_color <- scale_color_manual(name = "role", values = role_colors)
+sender_role_color <- scale_color_manual(name = "sender_role", values = role_colors)
+receiver_role_color <- scale_color_manual(name = "receiver_role", values = role_colors)
+dyad_color <- scale_color_manual(name = "dyad", values = dyad_colors)
