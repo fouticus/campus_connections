@@ -29,7 +29,9 @@ data_dir <- "../data/"
 
 
 ### Which semesters and nights we are looking at right now.
-semesters <- c("Fa15", "Sp16", "Fa16", "Sp17")
+#semesters <- c("Fa15", "Sp16", "Fa16", "Sp17")
+# Sp17 has some problems right now. edges sent to kccs17_4801 are on tue, but they are listed as attending on wed.
+semesters <- c("Fa15", "Sp16", "Fa16")  
 nights <- c("Mon", "Tue", "Wed", "Thu")
 
 
